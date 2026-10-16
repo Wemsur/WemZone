@@ -107,8 +107,15 @@ export function createInput(opts: InputOptions): InputSource {
     const v = Math.abs(delta) / dt
 
     const overThreshold = Math.abs(accum) >= CAMERA.STEP_THRESHOLD_PX
+    // 速度分支只对「触控板式」的小步事件生效。
+    // 滚轮一格是个大事件（约 100px），按事件间隔算出来的「速度」反而很高，
+    // 若不排除它，两格滚轮就会被误判成猛滑，750px 的阈值形同虚设。
+    // 真正的区别是粒度而不是速度：触控板产生许多小事件，滚轮产生少数大事件。
+    const trackpadLike = Math.abs(delta) <= CAMERA.TRACKPAD_MAX_EVENT_PX
     const fastFlick =
-      v >= CAMERA.STEP_SPEED_PX_MS && Math.abs(accum) >= CAMERA.STEP_SPEED_MIN_PX
+      trackpadLike &&
+      v >= CAMERA.STEP_SPEED_PX_MS &&
+      Math.abs(accum) >= CAMERA.STEP_SPEED_MIN_PX
 
     if (overThreshold || fastFlick) {
       committed = true

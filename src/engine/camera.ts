@@ -238,16 +238,24 @@ export function createCamera(cfg: CameraConfig): Engine {
         if (prefersReducedMotion()) return
         if (state !== 'PULL') setState('PULL')
         pullDir = intent.delta > 0 ? 1 : -1
+        // 饱和：未提交的滚动可能累计很大，但「微弱滚动」的观感不该线性放大
+        const d = clamp(intent.delta, -CAMERA.PULL_MAX_DELTA, CAMERA.PULL_MAX_DELTA)
         // 给位移 + 给速度：位移让画面偏离，速度带来过冲（果冻）
         const disp = clamp(
-          intent.delta * CAMERA.PULL_DISP_GAIN,
+          d * CAMERA.PULL_DISP_GAIN,
           -CAMERA.PULL_MAX_DISP,
           CAMERA.PULL_MAX_DISP,
         )
-        // 叠加而非覆盖：连续 pull 会更「弹」
+        // 叠加而非覆盖：连续 pull 会更「弹」。
+        // 叠加后仍要封顶 —— 否则连续快滚会把 x 累积到远超 PULL_MAX_DISP，
+        // 画面被推出视野（弹簧本身不会把 x 拉回上限，它只把 x 拉回 0）。
         spring = {
-          x: spring.x + disp,
-          v: spring.v + intent.delta * CAMERA.PULL_VEL_GAIN,
+          x: clamp(spring.x + disp, -CAMERA.PULL_MAX_DISP, CAMERA.PULL_MAX_DISP),
+          v: clamp(
+            spring.v + d * CAMERA.PULL_VEL_GAIN,
+            -CAMERA.PULL_MAX_DISP * 0.02,
+            CAMERA.PULL_MAX_DISP * 0.02,
+          ),
         }
         ensureFrame()
         break
