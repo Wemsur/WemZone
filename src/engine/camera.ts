@@ -20,6 +20,7 @@
  */
 
 import { onFrame, wake } from '@/lib/scheduler'
+import { prefersReducedMotion } from '@/lib/chase'
 
 import { CAMERA } from './constants'
 import { createInput, type InputSource } from './input'
@@ -79,6 +80,8 @@ export function createCamera(cfg: CameraConfig): Engine {
   let dirVec = { x: 0, y: 0 }
 
   let stopFrame: (() => void) | null = null
+  /** 当前 attach 的卸载函数；用于让 attach 幂等（见 attach 的注释） */
+  let detach: (() => void) | null = null
 
   const frameSubs = new Set<(f: CameraFrame) => void>()
   const settleSubs = new Set<(i: number) => void>()
@@ -231,6 +234,8 @@ export function createCamera(cfg: CameraConfig): Engine {
     switch (intent.kind) {
       case 'pull': {
         if (state === 'TRANSIT') return
+        // 无障碍：减少动效时不做果冻回弹
+        if (prefersReducedMotion()) return
         if (state !== 'PULL') setState('PULL')
         pullDir = intent.delta > 0 ? 1 : -1
         // 给位移 + 给速度：位移让画面偏离，速度带来过冲（果冻）
@@ -267,6 +272,21 @@ export function createCamera(cfg: CameraConfig): Engine {
       setState('IDLE')
       return
     }
+
+    // 无障碍：用户要求减少动效时，跳过弹性/补间，直接落位。
+    // 布局与内容完全保留，只是没有过渡动画（见 docs/DESIGN.md）。
+    if (prefersReducedMotion()) {
+      displayIndex = clamped
+      spring = { x: 0, v: 0 }
+      pull = { dy: 0, dd: 0, drx: 0 }
+      tween = null
+      velocity = 0
+      setState('IDLE')
+      notifySettle(displayIndex)
+      emitFrame()
+      return
+    }
+
     tween = makeTween(from, clamped, transitDuration(speed), easeInOutCubic)
     setState('TRANSIT')
     ensureFrame()
@@ -280,14 +300,22 @@ export function createCamera(cfg: CameraConfig): Engine {
 
   return {
     attach(): () => void {
+      // 幂等：重复 attach 先卸掉上一次的监听。
+      // 开发时 HMR 会反复重建组件，若每次 attach 都叠一个 window 监听，
+      // 一次按键会被处理 N 次（表现为「按一下跳好几格」），排查起来极具迷惑性。
+      detach?.()
+
       const detachInput = input.attach()
       const offIntent = input.onIntent(handleIntent)
       ensureFrame()
-      return () => {
+
+      detach = () => {
         offIntent()
         detachInput()
         releaseFrame()
+        detach = null
       }
+      return detach
     },
 
     subscribe(cb): () => void {
@@ -307,7 +335,11 @@ export function createCamera(cfg: CameraConfig): Engine {
         spring = { x: 0, v: 0 }
         pull = { dy: 0, dd: 0, drx: 0 }
         tween = null
+        velocity = 0
         setState('IDLE')
+        // 立即定位也要通知落位订阅者 —— 否则 Vue 侧的 current ref 与 URL hash
+        // 都不会跟着更新（深链接刷新后 HUD 与地址栏会停在旧值）。
+        notifySettle(displayIndex)
         emitFrame()
         return
       }

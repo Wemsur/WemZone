@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
+import BlurDebugPanel from '@/components/BlurDebugPanel.vue'
 import MobileWorld from '@/components/MobileWorld.vue'
 import World from '@/components/World.vue'
 import { provideCamera } from '@/composables/useCamera'
+import { useDeepLink } from '@/composables/useDeepLink'
+import { useMediaQuery } from '@/composables/useMediaQuery'
+import type { BlurMode } from '@/engine/blur'
 import { narrow } from '@/lib/viewport'
 import { ACTIVE_SECTIONS } from '@/sections'
 
@@ -14,14 +18,34 @@ import { ACTIVE_SECTIONS } from '@/sections'
  *  - 宽版：3D 平面 + 相机引擎（World.vue）
  *  - 窄版：原生竖直滚动 + snap（MobileWorld.vue）
  *
- * Phase 1 阶段两套都用占位方块，验证引擎与版式骨架。
+ * Phase 2 阶段：占位方块 + 运动模糊 A/B 原型。
  * 真内容在 Phase 4 填充。
  */
 
 const camera = provideCamera()
 
-/** 调试 HUD 只在宽版显示（窄版没有相机状态可看）。 */
-const showHud = computed(() => !narrow.value)
+/** 深链接：URL hash ↔ 当前区块（含前进/后退支持）。 */
+useDeepLink(camera)
+
+/** 运动模糊方案。Phase 2 用面板手动切换，Phase 5 定稿后写死。 */
+const blurMode = ref<BlurMode>('A')
+
+/** 用户要求减少动效时，模糊一并关掉（相机那边已经跳过了弹簧与补间）。 */
+const reduceMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
+const effectiveBlur = computed<BlurMode>(() => (reduceMotion.value ? 'off' : blurMode.value))
+
+/** 调试 UI 只在 DEV + 宽版显示。 */
+const showDebug = computed(() => import.meta.env.DEV && !narrow.value)
+
+/** 按 B 键循环切换模糊方案。 */
+function onKey(e: KeyboardEvent): void {
+  if (e.key !== 'b' && e.key !== 'B') return
+  const order: BlurMode[] = ['off', 'A', 'B']
+  blurMode.value = order[(order.indexOf(blurMode.value) + 1) % order.length]
+}
+
+onMounted(() => window.addEventListener('keydown', onKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <template>
@@ -33,7 +57,7 @@ const showHud = computed(() => !narrow.value)
     </template>
   </MobileWorld>
 
-  <World v-else>
+  <World v-else :blur-mode="effectiveBlur">
     <template v-for="section in ACTIVE_SECTIONS" :key="section.id" #[section.id]>
       <div class="placeholder">
         <span class="placeholder-index">{{ section.label }}</span>
@@ -41,11 +65,14 @@ const showHud = computed(() => !narrow.value)
     </template>
   </World>
 
-  <!-- 调试信息（Phase 1 临时，Phase 4 移除） -->
-  <div v-if="showHud" class="hud">
+  <!-- 调试信息（Phase 2 临时，Phase 4/5 移除） -->
+  <div v-if="showDebug" class="hud">
     <div>区块 {{ camera.current.value }} / {{ ACTIVE_SECTIONS.length - 1 }}</div>
     <div>状态 {{ camera.state.value }}</div>
+    <div>按 B 切换模糊方案</div>
   </div>
+
+  <BlurDebugPanel v-if="showDebug" v-model="blurMode" />
 </template>
 
 <style scoped>

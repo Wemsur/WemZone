@@ -204,4 +204,71 @@ describe('相机状态机', () => {
     expect(Math.abs(last)).toBeLessThan(1e-6)
     detach()
   })
+
+  it('goTo immediate 也会通知落位（深链接刷新后 HUD/hash 要跟着变）', () => {
+    const cam = makeEngine()
+    const detach = cam.attach()
+    const settled: number[] = []
+    cam.onSettle((i) => settled.push(i))
+    cam.goTo(2, { immediate: true })
+    expect(cam.current).toBe(2)
+    expect(settled).toEqual([2])
+    detach()
+  })
+
+  it('attach 幂等：重复 attach 不会让一次 step 走多格', () => {
+    // 回归测试：开发时 HMR 会反复重建组件，若 attach 每次都叠一个 window
+    // 监听，一次按键会被处理 N 次（按一下跳好几格）。
+    const cam = makeEngine()
+    cam.attach()
+    cam.attach()
+    cam.attach()
+
+    // 直接派发意图，模拟「输入层收到一次事件」
+    cam.step(1)
+    let guard = 0
+    while (cam.state !== 'IDLE' && guard++ < 500) pump(16)
+
+    // 只应走一格
+    expect(cam.current).toBe(1)
+  })
+})
+
+describe('相机状态机 · 减少动效', () => {
+  it('prefers-reduced-motion 时 step 直接落位，不经过 TRANSIT', () => {
+    // 覆盖 matchMedia：让 reduce 为真
+    vi.stubGlobal('window', {
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      setTimeout: () => 0,
+      clearTimeout: () => {},
+      innerHeight: 900,
+      matchMedia: (q: string) => ({ matches: q.includes('reduced-motion') }),
+    })
+
+    const cam = makeEngine()
+    const detach = cam.attach()
+    cam.step(1)
+    // 直接到 IDLE，没有中间态
+    expect(cam.state).toBe('IDLE')
+    expect(cam.current).toBe(1)
+    detach()
+  })
+
+  it('prefers-reduced-motion 时 pull 被忽略（无果冻）', () => {
+    vi.stubGlobal('window', {
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      setTimeout: () => 0,
+      clearTimeout: () => {},
+      innerHeight: 900,
+      matchMedia: (q: string) => ({ matches: q.includes('reduced-motion') }),
+    })
+
+    const cam = makeEngine()
+    const detach = cam.attach()
+    cam.dispatch({ kind: 'pull', delta: 200 })
+    expect(cam.state).toBe('IDLE')
+    detach()
+  })
 })
