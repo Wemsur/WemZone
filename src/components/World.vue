@@ -70,11 +70,20 @@ function sectionStyle(index: number): Record<string, string> {
 
 <template>
   <div id="stage">
-    <div class="idle-drift-x">
-      <div class="idle-drift-y">
-        <!-- 模糊层：必须是 #viewport 的祖先，否则 filter 会拍平 3D 场景 -->
-        <div ref="layerEl" class="blur-layer">
-          <div id="viewport" :style="{ '--perspective': `${CAMERA.PERSPECTIVE}rem` }">
+    <!-- 模糊层：filter 是分组属性，会让这一层的 transform-style 变成 flat，
+         而 flat 会**截断透视**（#viewport 的 perspective 传到这里就不再往下传）。
+         所以它必须在 #viewport 的**外面** —— 3D 场景先正确渲染完，
+         再对渲染结果做模糊。 -->
+    <div ref="layerEl" class="blur-layer">
+      <!-- 空闲晃动的**平移**分量：刻意放在 #viewport 外面。
+           在透视容器内做平移会被投影放大（内容在 z≈1300px 处，放大 3.5 倍），
+           实测 0.85rem 的位移会变成 153px 的屏幕偏移，完全不是「轻微」。 -->
+      <div class="drift-outer">
+        <div id="viewport" :style="{ '--perspective': `${CAMERA.PERSPECTIVE}rem` }">
+          <!-- 空闲晃动的**旋转**分量：必须留在透视里。
+               旋转让不同深度的内容移动不同距离，这才是「相机在浮动」的观感；
+               视口边缘横移几个像素读起来只是「整页在滑」。 -->
+          <div class="drift-inner">
             <div ref="worldEl" id="world">
               <section
                 v-for="(section, i) in ACTIVE_SECTIONS"

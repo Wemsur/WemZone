@@ -118,11 +118,15 @@ body {
 /* 空闲晃动的两层包装。
    **必须显式铺满**：它们带着 transform（动画），而带 transform 的元素会成为
    后代绝对定位的包含块。若它们的高度是 0（默认，因为里面只有绝对定位的子元素），
-   下面的 #viewport 用 inset: 0 就会塌成 0 高。 */
-.idle-drift-x,
-.idle-drift-y {
+   下面的 #viewport 用 inset: 0 就会塌成 0 高。
+
+   `.drift-outer` 在 #viewport **外面**，包含块是 #stage，所以用 inset: 0；
+   `.drift-inner` 在 #viewport **里面**，包含块是 #viewport，同样用 inset: 0。 */
+.drift-outer,
+.drift-inner {
   position: absolute;
   inset: 0;
+  transform-style: preserve-3d;
 }
 
 #viewport {
@@ -157,41 +161,59 @@ body {
 }
 
 /* ==========================================================================
-   空闲晃动
+   空闲晃动（相机在 3D 空间里浮动）
+
    需求要求「无滚动时相机也持续轻微晃动」。它与「静止零开销」相冲，
-   解法是把常驻动画从主线程挪到合成线程 —— 两条互质周期的 CSS 动画
-   （9s 与 13s → 合成 117s 拍频，肉眼永远看不出规律）。
-   IDLE 时 rAF 完全不排，Performance 面板应看到没有持续 frame 回调。
+   解法是把常驻动画从主线程挪到合成线程 —— CSS 动画跑在 compositor 上，
+   IDLE 时 rAF 完全不排，Performance 面板看不到持续的 frame 回调。
+
+   ## 为什么分两层，而且平移在外、旋转在内
+
+   一个元素只能有一条 `transform`，两条动画会互相覆盖，所以要分两层。
+
+   关键是**哪一层在透视容器里**：
+
+   - **平移放在 #viewport 外面**（`.drift-outer`）。在透视容器内做平移会被
+     投影放大 —— 内容在 z ≈ 1300px 处，缩放系数 P/(P−z) ≈ 3.5，所以
+     1px 的 3D 位移会变成 3.5px 的屏幕位移。实测把平移放进去时，
+     0.85rem 的位移放大成了 153px 的屏幕偏移，完全不是「轻微」。
+   - **旋转放在 #viewport 里面**（`.drift-inner`）。旋转本身不产生位移，
+     但会让不同深度的内容移动不同的距离 —— 这才是「相机在浮动」的观感来源。
+     视口边缘横移几个像素读起来是「整页在滑」，零点几度的倾斜读起来才是
+     「相机在飘」。所以旋转必须留在透视里。
+
+   两层周期 11s 与 17s 互质 → 合成 187s 的拍频，肉眼永远看不出规律。
+   这正是需求里「两个不同频率正弦叠加」要的效果。
    ========================================================================== */
-@keyframes drift-y {
+@keyframes drift-outer {
   from {
-    transform: translate3d(0, -0.18rem, 0);
+    transform: translate3d(-0.12rem, -0.07rem, 0);
   }
   to {
-    transform: translate3d(0, 0.18rem, 0);
+    transform: translate3d(0.12rem, 0.07rem, 0);
   }
 }
 
-@keyframes drift-x {
+@keyframes drift-inner {
   from {
-    transform: translate3d(-0.12rem, 0, 0);
+    transform: rotateX(-0.11deg) rotateY(0.15deg);
   }
   to {
-    transform: translate3d(0.12rem, 0, 0);
+    transform: rotateX(0.11deg) rotateY(-0.15deg);
   }
 }
 
-.idle-drift-y {
-  animation: drift-y 9s ease-in-out infinite alternate;
+.drift-outer {
+  animation: drift-outer 11s ease-in-out infinite alternate;
 }
 
-.idle-drift-x {
-  animation: drift-x 13s ease-in-out infinite alternate;
+.drift-inner {
+  animation: drift-inner 17s ease-in-out infinite alternate;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .idle-drift-y,
-  .idle-drift-x {
+  .drift-outer,
+  .drift-inner {
     animation: none;
   }
 }

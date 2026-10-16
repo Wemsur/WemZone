@@ -79,15 +79,22 @@ Celestial-Web 最大的结构差异 —— 它每帧要读每个 section 的 rec
 
 ```
 #stage (fixed, overflow:hidden)
-  .idle-drift-x / .idle-drift-y    ← CSS 动画（合成线程）
-    #viewport                      perspective: 120rem; perspective-origin 固定
-      #world                       transform: <每帧写>
-        section[data-i]            transform: <静态，启动时写一次>
+  .blur-layer                     ← filter 加在这里（#viewport 外面）
+    .drift-outer                  ← 空闲晃动的平移分量（无透视放大）
+      #viewport                   perspective: 120rem; perspective-origin 固定
+        .drift-inner              ← 空闲晃动的旋转分量（在透视里）
+          #world                  transform: <每帧写>
+            section[data-i]       transform: <静态，启动时写一次>
 ```
 
-**踩过的坑**：`.idle-drift-*` 带着 transform（动画），而带 transform 的元素会成为
-后代绝对定位的包含块。它们默认高度为 0（里面只有绝对定位的子元素），
-于是 `#viewport` 用 `inset: 0` 会塌成 0 高。**必须显式 `position: absolute; inset: 0`。**
+**两个必须记住的约束**：
+
+1. `.drift-*` 带 transform（动画），而带 transform 的元素会成为后代绝对定位的
+   包含块。它们默认高度为 0（里面只有绝对定位的子元素），于是 `#viewport` 用
+   `inset: 0` 会塌成 0 高。**必须显式 `position: absolute; inset: 0`。**
+2. `filter` 是分组属性，会让元素的 `transform-style` 变成 `flat`，而 `flat`
+   **截断透视** —— `#viewport` 的 `perspective` 传到 `flat` 那一层就不再往下传。
+   所以 `.blur-layer` 必须在 `#viewport` **外面**。
 
 ### 相机平移全进 `#world`，不写 `perspective-origin`
 
@@ -202,17 +209,37 @@ x(t) = e^(-ζω₀t)·(A·cos(ω_d t) + B·sin(ω_d t)) + target,   ω_d = ω₀
 
 ---
 
-## 七、空闲晃动（`idle.ts` / `main.css`）
+## 七、空闲晃动（`main.css` 的 `drift-*`）
 
 需求要求「静止也活着」，与 Celestial-Web 的铁律相反，是**刻意取舍**。
+解法不是放弃零开销，而是**把常驻动画从主线程挪到合成线程**：CSS 动画跑在
+compositor 上，`IDLE` 时 rAF 完全不排，Performance 面板看不到持续的 frame 回调。
 
-**解法不是放弃零开销，而是把常驻动画从主线程挪到合成线程**：
+### 分两层，且平移在外、旋转在内
 
-- 两条 CSS `@keyframes`，周期 **9s 与 13s（互质）→ 合成 117s 拍频**，
-  肉眼永远看不出规律。这正是「两个不同频率正弦叠加」要的效果。
-- 幅度 0.18rem（远小于视口 0.5%）。
-- `IDLE` 时 rAF 完全不跑。DevTools Performance 面板在静止时应看到
-  **没有持续的 frame 回调**，只有合成器活动。
+一个元素只能有一条 `transform`（两条动画会互相覆盖），所以分两层。
+关键是**哪一层在透视容器里**：
+
+| 分量 | 位置 | 为什么 |
+|---|---|---|
+| 平移 `translate3d` | `#viewport` **外面** | 在透视容器内做平移会被投影放大：内容在 z ≈ 1300px 处，缩放系数 `P/(P−z) ≈ 3.5`，1px 的 3D 位移变成 3.5px 屏幕位移 |
+| 旋转 `rotateX/Y` | `#viewport` **里面** | 旋转本身不产生位移，但让不同深度的内容移动不同距离 —— 这才是「相机在浮动」的来源。视口边缘横移几个像素读起来是「整页在滑」，零点几度的倾斜读起来才是「相机在飘」 |
+
+### 幅度是按实测反推的，不能凭直觉写
+
+**踩过的坑**：
+
+- 平移 0.85rem 放进透视容器 → 屏幕偏移 **153px**（约视口 10%），完全失控。
+- 旋转 1.4° → 屏幕跨度 **64px**（约视口 4%），仍然过大。
+- 最终值：平移 ±0.12rem、旋转 ±0.15° → 跨度约视口 **0.55%–0.73%**（约 9–11px），
+  既「轻微」又看得见。
+
+`src/engine/drift.test.ts` 会读 CSS 校验这些幅度落在区间内 —— 改数值时必须同步改测试。
+
+### 周期互质
+
+11s 与 17s 互质 → 合成 187s 的拍频，肉眼永远看不出规律。这正是需求里
+「两个不同频率正弦叠加」要的效果。
 
 ---
 
@@ -246,9 +273,12 @@ Phase 2 会把 A/B 都做出来给用户对比，附实测帧率。
 
 | 坑 | 症状 | 解法 |
 |---|---|---|
-| `.idle-drift-*` 未显式定位 | `#viewport` 塌成 0 高，什么都不显示 | `position: absolute; inset: 0` |
+| `.drift-*` 未显式定位 | `#viewport` 塌成 0 高，什么都不显示 | `position: absolute; inset: 0` |
+| `filter` 加在透视容器内 | 3D 场景当场拍平，区块全部堆在中心 | 模糊层放 `#viewport` **外面** |
+| 平移放进透视容器 | 晃动幅度被放大 3.5 倍，153px 的偏移 | 平移放外层，只有旋转留内层 |
 | `IDLE` 未 `return false` | 循环永不停止，静止零开销失效 | 补 `else` 分支返回 false |
 | `ensureFrame` 早退 | 首次转场后引擎永久死掉 | 导出 `wake()`，已注册时唤醒而非返回 |
 | `transform-origin: 50% 50%` | 内容块中心偏移 (w/2, h/2) | 用 `0 0` |
 | `tsconfig.node.json` 用 `noEmit` | TS6310：被引用的 project 不能禁用 emit | 改 `emitDeclarationOnly` + `outDir` |
 | 预览标签页后台节流 | rAF 降到 ~1fps，转场看起来要好几秒 | 用假时钟的单元测试验证，别信后台标签页的计时 |
+| 速度分支判「猛滑」 | 滚轮一格被当成猛滑，两格就翻页 | 判据是**粒度**不是速度：`TRACKPAD_MAX_EVENT_PX` |
