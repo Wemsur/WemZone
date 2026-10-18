@@ -237,13 +237,26 @@ export function createCamera(cfg: CameraConfig): Engine {
         if (prefersReducedMotion()) return
         // 滚动给的是一个**力**，不是一段预先写好的位移动画。
         // 力作用在同一个方程上：能量不够就退回井底（果冻），够了就越过势垒。
+        //
+        // 响应是**饱和**的（tanh），不是线性：触控板一次微滑累计只有几像素，
+        // 线性映射算出来的力约等于零 —— 用户会直接说「触控板没反应」。
+        // 饱和曲线把小输入抬到可感知的量级，同时不让大输入失控。
         const d = clamp(intent.delta, -CAMERA.PULL_MAX_DELTA, CAMERA.PULL_MAX_DELTA)
-        inputForce += d * CAMERA.PULL_FORCE_GAIN
+        const mag = Math.abs(d)
+        const sign = Math.sign(d)
+        if (mag === 0) return
+
+        const force =
+          sign * CAMERA.PULL_FORCE_MAX * Math.tanh(mag / CAMERA.PULL_FORCE_SATURATION_PX)
+        const impulse =
+          sign * CAMERA.PULL_IMPULSE_MAX * Math.tanh(mag / CAMERA.PULL_IMPULSE_SATURATION_PX)
+
+        inputForce += force
         // 同时给一点速度冲量，让轻滚也有可感知的「推」
         phys = {
           s: phys.s,
           v: clamp(
-            phys.v + d * CAMERA.PULL_IMPULSE_GAIN,
+            phys.v + impulse,
             -CAMERA.PHYSICS_MAX_SPEED,
             CAMERA.PHYSICS_MAX_SPEED,
           ),

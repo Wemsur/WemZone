@@ -7,13 +7,14 @@
 /* ==========================================================================
    WemZone / 庭域 WemZone — 设计令牌
 
-   用 Tailwind 3.4.19（与 Celestial Launcher 同源）。颜色令牌里，启动器那套
-   （surface-1..5 / text 三级 / brand）与 Celestial-Web 的 main.css 保持同构，
-   目的是 Phase 1.5 vendor 启动器组件时「复刻件与启动器像素级同源」。
+   用 Tailwind 3.4.19（与 Celestial Launcher 同源）。颜色令牌分两套，**别混用**：
 
-   --brand-hue 是全站唯一的色相源头：改这一个值，brand / green 系列全变。
-   与启动器的 use-theme.ts 同构（那边默认也是 38，这里换成 WemZone 的 #db6944
-   对应的色相）。每区可各自覆盖这个值，实现「每个区域可以使用不同颜色」。
+   - `--wz-*`：WemZone 自己的样式只能用这一套。它不会被 vendor 覆盖。
+   - 裸名字（`--surface-*` / `--color-*`）：给 vendor 启动器组件用，
+     由启动器的 omorphia 主题决定，这是「复刻与启动器像素级同源」的前提。
+
+   `--wz-brand-hue` 是 WemZone 全站唯一的色相源头：改这一个值，
+   `--wz-brand*` 系列全变。每区可各自覆盖，实现「每个区域可以使用不同颜色」。
    ========================================================================== */
 
 :root {
@@ -21,7 +22,40 @@
   --brand-hue: 18;
   --brand-sat: 68%;
 
-  /* --- 表面层 --- */
+  /* ======================================================================
+     WemZone 自己的令牌命名空间（--wz-*）
+
+     **为什么不能直接用 --color-brand / --surface-* / --color-text-***：
+     启动器的 `omorphia.scss` 在 main.css 之后加载，它会在 `.dark-mode` 下
+     重新定义这些名字 —— `--color-brand` 变成 Modrinth 的 `#1bd96a`（绿），
+     `--surface-*` 变成启动器的 #16181c 系。WemZone 自己的组件如果继续用
+     裸名字，就会被启动器的主题**静默劫持**：DOM 结构对、布局对，但颜色全错。
+
+     实测症状：运动模糊的拖影层用 `--color-brand` 画，结果整片半透明绿。
+
+     所以分两类：
+       - `--wz-*`   WemZone 自己的样式**只能**用这一套，永不被 vendor 覆盖。
+       - 裸名字     留给 vendor 组件，由启动器主题决定（这是复刻的前提）。
+     ====================================================================== */
+  --wz-brand-hue: 18;
+  --wz-brand-sat: 68%;
+  --wz-brand: hsl(var(--wz-brand-hue), var(--wz-brand-sat), 62%);
+  --wz-brand-soft: hsl(var(--wz-brand-hue), 72%, 75%);
+  --wz-brand-dim: hsl(var(--wz-brand-hue), 31%, 59%);
+  --wz-brand-wash: hsl(var(--wz-brand-hue) var(--wz-brand-sat) 62% / 0.22);
+  --wz-brand-shadow: hsl(var(--wz-brand-hue) var(--wz-brand-sat) 62% / 0.7);
+
+  --wz-surface-1: #1a1a1a;
+  --wz-surface-2: #202020;
+  --wz-surface-3: #262626;
+  --wz-surface-4: #303030;
+  --wz-surface-5: #42444a;
+
+  --wz-text-primary: hsl(var(--wz-brand-hue), 26%, 93%);
+  --wz-text-default: hsl(var(--wz-brand-hue), 12%, 60%);
+  --wz-text-tertiary: hsl(var(--wz-brand-hue), 14%, 64%);
+
+  /* --- 表面层（vendor 组件用，会被启动器主题覆盖，这是有意的） --- */
   --surface-1: #1a1a1a;
   --surface-1-5: #1b1b1b;
   --surface-2: #202020;

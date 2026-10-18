@@ -101,6 +101,16 @@ export function createInput(opts: InputOptions): InputSource {
     // 已提交 / 冷却中 / 锁定：丢弃（这就是吞掉惯性尾巴的地方）
     if (committed || now < cooldownUntil) return
 
+    // 实时反馈：每个事件都把**本事件的位移**作为一个 pull 发出去。
+    //
+    // 早先只在手势静默结束后发一次 pull，于是触控板微滑的整个过程里
+    // 相机一动不动，等手指抬起才动一下 —— 用户会直接说「触控板微滑没反应」。
+    // 现在滑动过程中的每一帧都在推，与真实手感一致。
+    //
+    // 用**单事件 delta** 而不是累计量：累计量在慢滑时会持续增长，
+    // 会把「轻轻滑一下」放大成一次猛推。
+    emit({ kind: 'pull', delta })
+
     accum += delta
 
     const dt = Math.max(now - prevT, 1)
@@ -126,13 +136,15 @@ export function createInput(opts: InputOptions): InputSource {
   }
 
   /**
-   * 手势结束时（静默够久且未提交）把累计位移作为一次 pull 发出去。
-   * 这给了「微弱滚动 → 果冻回弹」的输入。
+   * 手势结束时的兜底。
+   *
+   * 每次 wheel 已经实时发过 pull 了，所以这里**不再重复发送** ——
+   * 再发一次等于把整段手势的力翻倍。这个定时器现在只用于在静默后
+   * 重置手势状态，让下一次滚动被识别为新手势。
    */
   function settleGesture(): void {
-    if (committed || accum === 0) return
-    if (performance.now() - lastT < CAMERA.GESTURE_GAP_MS) return
-    emit({ kind: 'pull', delta: accum })
+    if (committed) return
+    // 静默够久：本手势结束，清空累计量（pull 已经在事件里发过了）
     accum = 0
   }
 

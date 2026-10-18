@@ -28,7 +28,6 @@ const props = withDefaults(defineProps<{ blurMode?: BlurMode }>(), { blurMode: '
 const camera = useCamera()
 const worldEl = ref<HTMLElement | null>(null)
 const layerEl = ref<HTMLElement | null>(null)
-const streakEl = ref<HTMLElement | null>(null)
 const feBlurEl = ref<SVGFEGaussianBlurElement | null>(null)
 
 let detach: (() => void) | null = null
@@ -41,7 +40,6 @@ onMounted(() => {
 
   const targets: BlurTargets = {
     layer: layerEl.value!,
-    streak: streakEl.value!,
     feBlur: feBlurEl.value,
   }
 
@@ -54,15 +52,18 @@ onMounted(() => {
 onBeforeUnmount(() => {
   stopFrame?.()
   stopFrame = null
-  if (layerEl.value && streakEl.value) {
-    clearBlur({ layer: layerEl.value, streak: streakEl.value, feBlur: feBlurEl.value })
+  if (layerEl.value) {
+    clearBlur({ layer: layerEl.value, feBlur: feBlurEl.value })
   }
   detach?.()
   detach = null
 })
 
-/** 每个区块的静态 transform（位置 + 距离补偿），启动时算一次。 */
+/** 每个区块的静态 transform（位置 + 距离补偿），启动时算一次。
+ *  调参面板改了几何参数后，`geometryVersion` 变化会让这里重算。 */
 function sectionStyle(index: number): Record<string, string> {
+  // 读取版本号建立响应式依赖（值本身不参与计算）。
+  void camera.geometryVersion.value
   const stop = camera.engine.path.stops[index]
   return { transform: staticSectionTransform(stop, CAMERA.PERSPECTIVE) }
 }
@@ -101,10 +102,6 @@ function sectionStyle(index: number): Record<string, string> {
       </div>
     </div>
 
-    <!-- 方向性拖影：一道沿运动方向的光晕，把「糊」读成「拖」。
-         不复制 DOM，只是叠在场景上的一层渐变。 -->
-    <div ref="streakEl" class="streak-layer" aria-hidden="true" />
-
     <!-- 方案 B 用的各向异性模糊滤镜。常驻但 stdDeviation 为 0，
          只有切到 B 模式时才被 #world 的祖先层引用。 -->
     <svg class="blur-svg" aria-hidden="true">
@@ -121,23 +118,6 @@ function sectionStyle(index: number): Record<string, string> {
 .blur-layer {
   position: absolute;
   inset: 0;
-}
-
-/* 拖影层：沿 --streak-angle 方向的一道亮带，两端渐隐 */
-.streak-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0;
-  background: linear-gradient(
-    var(--streak-angle, 180deg),
-    transparent 0%,
-    color-mix(in srgb, var(--color-brand) 22%, transparent) 42%,
-    color-mix(in srgb, var(--color-text-primary) 14%, transparent) 50%,
-    color-mix(in srgb, var(--color-brand) 22%, transparent) 58%,
-    transparent 100%
-  );
-  mix-blend-mode: screen;
 }
 
 .blur-svg {

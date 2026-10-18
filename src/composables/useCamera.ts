@@ -43,6 +43,15 @@ export interface CameraApi {
   engine: Engine
   /** 把引擎挂到 DOM 上（World.vue 调用） */
   attachTo(worldEl: HTMLElement): () => void
+  /**
+   * 几何参数（间距 / 振幅 / 距离）改变后重建路径。
+   *
+   * 调参面板用：改完常量调一下，区块位置与相机路径立刻按新参数重排。
+   * **不影响**力学参数（k / damping / 力增益）—— 那些每帧现读，不用重建。
+   */
+  rebuildStops(): void
+  /** 重建路径后递增，供模板重新计算各区块的静态 transform。 */
+  geometryVersion: Readonly<Ref<number>>
 }
 
 const CAMERA_KEY: InjectionKey<CameraApi> = Symbol('camera')
@@ -55,6 +64,8 @@ export function provideCamera(): CameraApi {
 
   const current = ref(0)
   const state = ref<string>('IDLE')
+  /** 几何重建计数器：模板依赖它来重算各区块的静态 transform。 */
+  const geometryVersion = ref(0)
 
   // 每帧写 #world —— 全站唯一的每帧 DOM 写入点
   let worldEl: HTMLElement | null = null
@@ -82,6 +93,15 @@ export function provideCamera(): CameraApi {
       worldEl = el
       return engine.attach()
     },
+    rebuildStops(): void {
+      engine.rebuild(buildStops())
+      // 引擎的 path 换了，各区块的静态 transform 要跟着重算 ——
+      // 递增计数器让模板重新求值（这是低频操作，只在调参时发生）。
+      geometryVersion.value++
+      // 路径变了，当前井可能越界；引擎内部已 clamp，这里把视图同步一次。
+      engine.goTo(engine.target, { immediate: true })
+    },
+    geometryVersion: readonly(geometryVersion),
   }
 
   provide(CAMERA_KEY, api)

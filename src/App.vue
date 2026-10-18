@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
-import BlurDebugPanel from '@/components/BlurDebugPanel.vue'
 import MobileWorld from '@/components/MobileWorld.vue'
+import TuningPanel from '@/components/TuningPanel.vue'
 import VendorDemo from '@/components/VendorDemo.vue'
 import World from '@/components/World.vue'
 import { provideCamera } from '@/composables/useCamera'
@@ -76,7 +76,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     <div>按 B 切换模糊方案</div>
   </div>
 
-  <BlurDebugPanel v-if="showDebug" v-model="blurMode" />
+  <TuningPanel v-if="showDebug" v-model:blur-mode="blurMode" />
 </template>
 
 <style scoped>
@@ -88,16 +88,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   aspect-ratio: 16 / 9;
   display: grid;
   place-items: center;
-  border: 0.125rem solid var(--color-brand);
+  border: 0.125rem solid var(--wz-brand);
   border-radius: var(--radius-card);
-  background: color-mix(in srgb, var(--surface-4) 92%, transparent);
-  box-shadow: 0 0 4rem color-mix(in srgb, var(--color-brand) 22%, transparent);
+  background: color-mix(in srgb, var(--wz-surface-3) 92%, transparent);
+  box-shadow: 0 0 4rem color-mix(in srgb, var(--wz-brand) 22%, transparent);
 }
 
 .placeholder-index {
   font-size: 2.25rem;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--wz-text-primary);
   letter-spacing: 0.08em;
   text-align: center;
 }
@@ -109,7 +109,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   font-family: ui-monospace, monospace;
   font-size: 0.8125rem;
   line-height: 1.5;
-  color: var(--color-text-tertiary);
+  color: var(--wz-text-tertiary);
   pointer-events: none;
   user-select: none;
 }
