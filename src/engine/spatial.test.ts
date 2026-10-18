@@ -35,13 +35,13 @@ describe('buildPath', () => {
   it('centripetal CR 几乎不过冲（真正的对照见 spatial-overshoot.test.ts）', () => {
     const path = buildPath(stops)
     // 每段采样 200 个点，检查 x 不会明显甩出相邻两锚点范围之外。
-    // 实测残余过冲只出现在**首段**（端点复制所致，约 0.19rem），
-    // 内段是严格 0。0.25rem 的容差覆盖这个端点效应，
+    // 实测残余过冲只出现在**首段**（端点幽灵点所致，约 0.25rem），
+    // 内段是严格 0。0.27rem 的容差覆盖这个端点效应，
     // 与 uniform CR 的定量对比在 spatial-overshoot.test.ts。
     for (let seg = 0; seg < path.last; seg++) {
       const lo = Math.min(stops[seg].x, stops[seg + 1].x)
       const hi = Math.max(stops[seg].x, stops[seg + 1].x)
-      const slack = 0.25 // rem
+      const slack = 0.27 // rem
       for (let k = 0; k <= 200; k++) {
         const x = path.sample(seg + k / 200).x
         expect(x).toBeGreaterThanOrEqual(lo - slack)
@@ -66,6 +66,36 @@ describe('buildPath', () => {
     expect(path.sample(0.5).d).toBeCloseTo(40, 6)
     // 四分之一处
     expect(path.sample(0.25).d).toBeCloseTo(35, 6)
+  })
+
+  it('端点处有非零切线（否则首页的果冻会消失）', () => {
+    const path = buildPath(stops)
+    // `sample(s)` 对 s 的导数就是相机沿路径的速度。端点处若为 0，
+    // 相机在首页附近几乎不动 —— 实测曾是其他区的 1/30。
+    const eps = 1e-4
+    const speedAt = (s: number): number => {
+      const a = path.sample(s - eps)
+      const b = path.sample(s + eps)
+      return Math.hypot(b.x - a.x, b.y - a.y) / (2 * eps)
+    }
+
+    const ends = speedAt(0)
+    const endsLast = speedAt(path.last)
+    // 与内段（中段切线量级约 60–115rem/索引）同一量级，而不是 0
+    expect(ends).toBeGreaterThan(20)
+    expect(endsLast).toBeGreaterThan(20)
+  })
+
+  it('同样的索引偏移在首段与内段产生相近的视觉位移', () => {
+    const path = buildPath(stops)
+    const shift = 0.0123 // 一次滚轮 pull 的索引峰值（见 physics.test.ts）
+    const disp = (s: number): number => {
+      const a = path.sample(s)
+      const b = path.sample(s + shift)
+      return Math.hypot(b.x - a.x, b.y - a.y)
+    }
+    // 首页（端点）不应比内段慢一个数量级
+    expect(disp(0)).toBeGreaterThan(disp(1) * 0.5)
   })
 
   it('单区时处处返回该区', () => {

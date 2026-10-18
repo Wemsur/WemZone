@@ -73,9 +73,10 @@ describe('centripetal CR 的不过冲性质', () => {
 
     // centripetal 应当显著优于 uniform（Yuksel 2011 的结论）
     expect(centripetalWorst).toBeLessThan(uniformWorst)
-    // 绝对值也小：本项目 26rem 振幅下，过冲主要来自首段的端点效应，
-    // 实测约 0.19rem（0.7% 振幅，16px 根字号下约 3px）
-    expect(centripetalWorst).toBeLessThan(0.25)
+    // 绝对值也小：本项目 26rem 振幅下，过冲主要来自首段的端点效应。
+    // 端点用「半镜像」幽灵点（见 spatial.ts 的 pointAt）：过冲 0.250rem，
+    // 是振幅的 0.96%、16px 根字号下约 4px。
+    expect(centripetalWorst).toBeLessThan(0.27)
   })
 
   it('过冲量级可忽略（< 1% 振幅）', () => {
