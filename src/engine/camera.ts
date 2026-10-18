@@ -1,22 +1,27 @@
 /**
- * 相机状态机
+ * 相机 —— 一个连续受力的质点
  *
- * ```
- * IDLE    --intent(pull)--------> PULL      弹簧解析积分，位移后回弹
- * IDLE    --intent(step|jump)--> TRANSIT   固定时长补间，先慢后快再慢
- * PULL    --弹簧收敛----------> IDLE
- * PULL    --intent(step)------> TRANSIT    （冲量丢弃，从当前 index 重新补间）
- * PULL    --intent(pull)------> PULL       （冲量叠加）
- * TRANSIT --补间完成----------> SETTLE
- * TRANSIT --intent(*)---------> TRANSIT    （忽略，输入锁定）
- * SETTLE  --收敛--------------> IDLE
- * ```
+ * 没有状态机。整站只有一个方程（见 `physics.ts`）：
  *
- * **IDLE 时不排 rAF** —— 这是「静止时主线程零开销」的实现。空闲晃动交给
- * `idle.ts` 的 CSS 合成动画（跑在合成线程，与主线程无关）。
+ *     a = F_势能 + F_阻尼 + F_锚定 + F_输入
  *
- * 状态是唯一的真值来源：`displayIndex` 是 float，目标永远是整数。
- * 整个引擎围绕这一个标量转。
+ * 果冻回弹、切换、落位都是它的不同能量状态，不是不同代码路径。
+ *
+ * ## 两层职责
+ *
+ * | 层 | 决定什么 |
+ * |---|---|
+ * | **意图**（`input.ts`） | 目标井是哪个。一次手势最多 ±1，保证「一次滚动只走一格」 |
+ * | **力学**（`physics.ts`） | 怎么走过去。轨迹的「先慢后快再慢」全部来自方程本身 |
+ *
+ * 滚动时给的力（`pull`）不是单独一条「果冻动画」—— 它就是加进同一个方程的
+ * 输入力。能量不够就越不过势垒、退回井底并阻尼振荡；能量够就落进下一个井。
+ * 两者是同一种运动。
+ *
+ * ## 停帧
+ *
+ * 当相机静止在目标井、且没有待处理的输入力时，`tick` 返回 false 让 rAF 停下
+ * —— 这是「静止时主线程零开销」的实现。空闲晃动交给 CSS 合成动画（见 main.css）。
  */
 
 import { onFrame, wake } from '@/lib/scheduler'
@@ -24,9 +29,14 @@ import { prefersReducedMotion } from '@/lib/chase'
 
 import { CAMERA } from './constants'
 import { createInput, type InputSource } from './input'
+import {
+  advance,
+  atRest,
+  substepCount,
+  type PhysicsParams,
+  type PhysicsState,
+} from './physics'
 import { buildPath, type CameraPath } from './spatial'
-import { springSettled, springSolve, type SpringState } from './spring'
-import { transitDuration, easeInOutCubic, makeTween, type Tween } from './tween'
 import type { CameraFrame, CameraPose, CameraStateName, Intent, Stop } from './types'
 
 export interface CameraConfig {
@@ -44,51 +54,66 @@ export interface Engine {
   onSettle(cb: (index: number) => void): () => void
   goTo(index: number, opts?: { immediate?: boolean }): void
   step(dir: 1 | -1): void
-  /** 当前整数区块（最近停靠点）。 */
+  /** 当前整数区块（最近的井）。 */
   readonly current: number
-  /** 当前状态名。 */
+  /**
+   * 粗略的「运动状态」标签。
+   *
+   * **这不是状态机** —— 相机内部只有一个连续的 `s` / `v`。这个标签纯粹是给
+   * UI / 调试显示用的：由「是否在动」与「是否在目标井」推出来，不参与运动计算。
+   */
   readonly state: CameraStateName
+  /** 连续索引（含转场中的小数）。调参面板显示用。 */
+  readonly displayIndex: number
+  /** 目标井（整数）。 */
+  readonly target: number
   readonly path: CameraPath
   /** 手动注入一个意图（调试 / 测试用）。 */
   dispatch(intent: Intent): void
+  /** 重建空间路径（调参用，几何参数改了才需要）。 */
+  rebuild(stops: readonly Stop[]): void
 }
 
 export function createCamera(cfg: CameraConfig): Engine {
-  const path = buildPath(cfg.stops)
-  const last = path.last
+  let path = buildPath(cfg.stops)
+  let last = path.last
 
   function clamp(v: number, lo: number, hi: number): number {
     return v < lo ? lo : v > hi ? hi : v
   }
 
-  /* ---- 状态 ---- */
-  let state: CameraStateName = 'IDLE'
-  let displayIndex = 0
+  /* ---- 唯一的运动状态 ---- */
+  let phys: PhysicsState = { s: 0, v: 0 }
+  /** 目标井（整数索引） */
+  let anchor = 0
+  /** 已通知过的落位索引 */
   let settledIndex = 0
+  /** 本帧剩余的输入力（由 pull 意图累积，每帧耗散） */
+  let inputForce = 0
+  /** 输入力的衰减半衰期（ms）：滚轮的一次冲量不该持续几秒 */
+  const INPUT_FORCE_DECAY_MS = 90
 
-  /** 弹簧作用在「相对静止位姿的偏移量」上，单位 rem。 */
-  let spring: SpringState = { x: 0, v: 0 }
-  /** 弹簧偏移的方向（由 pull 的符号决定） */
-  let pullDir = 1
-  /** 弹簧偏移如何映射到位姿 */
-  let pull: { dy: number; dd: number; drx: number } = { dy: 0, dd: 0, drx: 0 }
-
-  let tween: Tween | null = null
-
-  /** 速度（rem/ms，index 的变化率）与运动方向，驱动模糊与动态倾斜 */
+  /** 驱动运动模糊与动态倾斜：索引/秒 */
   let velocity = 0
   let dirVec = { x: 0, y: 0 }
 
   let stopFrame: (() => void) | null = null
-  /** 当前 attach 的卸载函数；用于让 attach 幂等（见 attach 的注释） */
   let detach: (() => void) | null = null
 
   const frameSubs = new Set<(f: CameraFrame) => void>()
   const settleSubs = new Set<(i: number) => void>()
 
+  function physicsParams(): PhysicsParams {
+    return {
+      k: CAMERA.PHYSICS_K,
+      damping: CAMERA.PHYSICS_DAMPING,
+      maxSpeed: CAMERA.PHYSICS_MAX_SPEED,
+    }
+  }
+
   /* ---- 输入 ---- */
   const input: InputSource = createInput({
-    getIndex: () => displayIndex,
+    getIndex: () => phys.s,
     last,
   })
 
@@ -98,34 +123,42 @@ export function createCamera(cfg: CameraConfig): Engine {
   }
 
   function buildFrame(): CameraFrame {
-    const pose = currentPose()
     return {
-      index: displayIndex,
-      pose,
+      index: phys.s,
+      pose: currentPose(),
       velocity,
       dir: dirVec,
-      state,
+      state: stateLabel(),
     }
   }
 
-  /** 把 displayIndex + 弹簧偏移合成最终位姿。 */
+  /**
+   * 给 UI 看的粗略标签。**不参与运动计算** —— 它只是从连续的 s / v 推出来的。
+   */
+  function stateLabel(): CameraStateName {
+    const still = Math.abs(phys.v) < 0.05
+    const atAnchor = Math.abs(phys.s - anchor) < 0.02
+    if (still && atAnchor) return 'IDLE'
+    if (atAnchor) return 'PULL' // 在目标井附近但还在晃 = 果冻
+    if (still) return 'SETTLE'
+    return 'TRANSIT'
+  }
+
+  /** 把连续索引 + 速度驱动的倾斜合成最终位姿。 */
   function currentPose(): CameraPose {
-    const base = path.sample(displayIndex)
-    const rx = base.rx + pull.drx + dynamicTiltX()
-    const ry = base.ry + dynamicTiltY()
+    const base = path.sample(phys.s)
     return {
       x: base.x,
-      y: base.y + pull.dy,
-      d: base.d + pull.dd,
-      rx,
-      ry,
+      y: base.y,
+      d: base.d,
+      rx: base.rx + dynamicTiltX(),
+      ry: base.ry + dynamicTiltY(),
     }
   }
 
   /** 速度驱动的动态倾斜：越快越「侧倾」，像飞机转弯。 */
   function dynamicTiltX(): number {
-    const t = clamp(velocity * CAMERA.TILT_VEL_GAIN, -CAMERA.TILT_MAX_DEG, CAMERA.TILT_MAX_DEG)
-    return t
+    return clamp(velocity * CAMERA.TILT_VEL_GAIN, -CAMERA.TILT_MAX_DEG, CAMERA.TILT_MAX_DEG)
   }
 
   function dynamicTiltY(): number {
@@ -140,50 +173,33 @@ export function createCamera(cfg: CameraConfig): Engine {
   /* ---- 帧循环 ---- */
 
   function tick(dtMs: number): boolean {
-    const before = displayIndex
+    const dtSec = Math.min(dtMs, CAMERA.MAX_DT_MS) / 1000
+    const p = physicsParams()
+    const steps = substepCount(dtSec)
+    const sub = dtSec / steps
 
-    if (state === 'PULL') {
-      spring = springSolve(spring, 0, dtMs)
-      applyPull()
-      if (springSettled(spring, 0)) {
-        spring = { x: 0, v: 0 }
-        pull = { dy: 0, dd: 0, drx: 0 }
-        setState('IDLE')
-        emitFrame()
-        return false // 停帧
-      }
-    } else if (state === 'TRANSIT' && tween) {
-      displayIndex = tween.step(dtMs)
-      if (tween.done) {
-        displayIndex = Math.round(displayIndex)
-        tween = null
-        setState('SETTLE')
-        notifySettle(displayIndex)
-      }
-    } else if (state === 'SETTLE') {
-      // 补间端点速度已是 0，理论上不需要吸收；这里只处理被 goTo 打断的残余
-      if (Math.abs(displayIndex - Math.round(displayIndex)) < 1e-4) {
-        displayIndex = Math.round(displayIndex)
-        // 速度归零：否则 Phase 2 的运动模糊会因为残留速度而卡住不关
-        velocity = 0
-        setState('IDLE')
-        emitFrame()
-        return false // 停帧
-      }
-    } else {
-      // IDLE：没有任何交互动画在跑。**必须停帧** —— 这正是
-      // 「静止时主线程零开销」的实现。空闲晃动由 CSS 合成动画承担，
-      // 跑在合成线程，与这个循环无关。
-      velocity = 0
-      emitFrame()
-      return false
+    for (let i = 0; i < steps; i++) {
+      phys = advance(phys, anchor, inputForce, sub, p)
     }
 
-    // 速度（rem/ms）：用 index 的变化率换算成世界距离的近似
-    const dt = Math.max(dtMs, 1)
-    const rawV = (displayIndex - before) / dt
-    velocity = velocity * 0.6 + rawV * 0.4 // 轻度平滑，避免抖动
+    // 输入力按半衰期衰减（帧率无关）
+    inputForce *= Math.pow(2, -dtMs / INPUT_FORCE_DECAY_MS)
+    if (Math.abs(inputForce) < 1e-3) inputForce = 0
+
+    // 速度：索引/秒，供模糊与倾斜使用
+    velocity = phys.v
     updateDirVec()
+
+    // 落位检测：进入目标井且速度很小
+    if (atRest(phys.s, phys.v, anchor)) {
+      // 吸附到井底，避免长期停在 0.9997
+      phys = { s: anchor, v: 0 }
+      velocity = 0
+      inputForce = 0
+      notifySettle(anchor)
+      emitFrame()
+      return false // 停帧：静止零开销
+    }
 
     emitFrame()
     return true
@@ -191,31 +207,15 @@ export function createCamera(cfg: CameraConfig): Engine {
 
   function updateDirVec(): void {
     const eps = 0.01
-    const a = path.sample(displayIndex - eps)
-    const b = path.sample(displayIndex + eps)
+    const a = path.sample(phys.s - eps)
+    const b = path.sample(phys.s + eps)
     const dx = b.x - a.x
     const dy = b.y - a.y
     const len = Math.hypot(dx, dy) || 1
     dirVec = { x: dx / len, y: dy / len }
   }
 
-  function applyPull(): void {
-    // 弹簧位移 → 位姿偏移。方向由 pullDir 决定。
-    pull = {
-      dy: spring.x * pullDir,
-      dd: Math.abs(spring.x) * 0.15,
-      drx: spring.x * pullDir * 0.9,
-    }
-  }
-
-  function setState(next: CameraStateName): void {
-    state = next
-    if (next === 'TRANSIT') input.lock()
-    else input.unlock()
-  }
-
   function ensureFrame(): void {
-    // 已经注册过就只唤醒 —— 反复注册/注销会丢掉循环的连续性
     if (stopFrame) {
       wake()
       return
@@ -228,75 +228,60 @@ export function createCamera(cfg: CameraConfig): Engine {
     stopFrame = null
   }
 
-  /* ---- 意图处理 ---- */
+  /* ---- 意图 ---- */
 
   function handleIntent(intent: Intent): void {
     switch (intent.kind) {
       case 'pull': {
-        if (state === 'TRANSIT') return
-        // 无障碍：减少动效时不做果冻回弹
+        // 无障碍：减少动效时不做果冻
         if (prefersReducedMotion()) return
-        if (state !== 'PULL') setState('PULL')
-        pullDir = intent.delta > 0 ? 1 : -1
-        // 饱和：未提交的滚动可能累计很大，但「微弱滚动」的观感不该线性放大
+        // 滚动给的是一个**力**，不是一段预先写好的位移动画。
+        // 力作用在同一个方程上：能量不够就退回井底（果冻），够了就越过势垒。
         const d = clamp(intent.delta, -CAMERA.PULL_MAX_DELTA, CAMERA.PULL_MAX_DELTA)
-        // 给位移 + 给速度：位移让画面偏离，速度带来过冲（果冻）
-        const disp = clamp(
-          d * CAMERA.PULL_DISP_GAIN,
-          -CAMERA.PULL_MAX_DISP,
-          CAMERA.PULL_MAX_DISP,
-        )
-        // 叠加而非覆盖：连续 pull 会更「弹」。
-        // 叠加后仍要封顶 —— 否则连续快滚会把 x 累积到远超 PULL_MAX_DISP，
-        // 画面被推出视野（弹簧本身不会把 x 拉回上限，它只把 x 拉回 0）。
-        spring = {
-          x: clamp(spring.x + disp, -CAMERA.PULL_MAX_DISP, CAMERA.PULL_MAX_DISP),
+        inputForce += d * CAMERA.PULL_FORCE_GAIN
+        // 同时给一点速度冲量，让轻滚也有可感知的「推」
+        phys = {
+          s: phys.s,
           v: clamp(
-            spring.v + d * CAMERA.PULL_VEL_GAIN,
-            -CAMERA.PULL_MAX_DISP * 0.02,
-            CAMERA.PULL_MAX_DISP * 0.02,
+            phys.v + d * CAMERA.PULL_IMPULSE_GAIN,
+            -CAMERA.PHYSICS_MAX_SPEED,
+            CAMERA.PHYSICS_MAX_SPEED,
           ),
         }
         ensureFrame()
         break
       }
       case 'step': {
-        const target = Math.round(displayIndex) + intent.dir
-        goToInternal(target, intent.speed)
+        setAnchor(Math.round(anchor) + intent.dir)
         break
       }
       case 'jump': {
-        goToInternal(intent.index, 0)
+        setAnchor(intent.index)
         break
       }
     }
   }
 
-  function goToInternal(target: number, speed: number): void {
-    const clamped = clamp(target, 0, last)
-    // 从当前位置（含弹簧偏移）出发，避免跳变
-    const from = displayIndex
-    if (Math.abs(from - clamped) < 1e-4) {
-      setState('IDLE')
+  /** 设置目标井。物理负责走过去 —— 没有补间、没有缓动曲线。 */
+  function setAnchor(target: number): void {
+    const clamped = clamp(Math.round(target), 0, last)
+    if (clamped === anchor) {
+      // 已经在目标井：给一点「顶一下」的力，让边界也有反馈
+      ensureFrame()
       return
     }
+    anchor = clamped
 
-    // 无障碍：用户要求减少动效时，跳过弹性/补间，直接落位。
-    // 布局与内容完全保留，只是没有过渡动画（见 docs/DESIGN.md）。
+    // 无障碍：减少动效时直接落位
     if (prefersReducedMotion()) {
-      displayIndex = clamped
-      spring = { x: 0, v: 0 }
-      pull = { dy: 0, dd: 0, drx: 0 }
-      tween = null
+      phys = { s: anchor, v: 0 }
       velocity = 0
-      setState('IDLE')
-      notifySettle(displayIndex)
+      inputForce = 0
+      notifySettle(anchor)
       emitFrame()
       return
     }
 
-    tween = makeTween(from, clamped, transitDuration(speed), easeInOutCubic)
-    setState('TRANSIT')
     ensureFrame()
   }
 
@@ -310,7 +295,7 @@ export function createCamera(cfg: CameraConfig): Engine {
     attach(): () => void {
       // 幂等：重复 attach 先卸掉上一次的监听。
       // 开发时 HMR 会反复重建组件，若每次 attach 都叠一个 window 监听，
-      // 一次按键会被处理 N 次（表现为「按一下跳好几格」），排查起来极具迷惑性。
+      // 一次按键会被处理 N 次（表现为「按一下跳好几格」）。
       detach?.()
 
       const detachInput = input.attach()
@@ -339,23 +324,21 @@ export function createCamera(cfg: CameraConfig): Engine {
 
     goTo(index, opts): void {
       if (opts?.immediate) {
-        displayIndex = clamp(Math.round(index), 0, last)
-        spring = { x: 0, v: 0 }
-        pull = { dy: 0, dd: 0, drx: 0 }
-        tween = null
+        anchor = clamp(Math.round(index), 0, last)
+        phys = { s: anchor, v: 0 }
         velocity = 0
-        setState('IDLE')
+        inputForce = 0
         // 立即定位也要通知落位订阅者 —— 否则 Vue 侧的 current ref 与 URL hash
         // 都不会跟着更新（深链接刷新后 HUD 与地址栏会停在旧值）。
-        notifySettle(displayIndex)
+        notifySettle(anchor)
         emitFrame()
         return
       }
-      goToInternal(index, 0)
+      setAnchor(index)
     },
 
     step(dir): void {
-      goToInternal(Math.round(displayIndex) + dir, 0)
+      setAnchor(Math.round(anchor) + dir)
     },
 
     dispatch(intent): void {
@@ -363,11 +346,27 @@ export function createCamera(cfg: CameraConfig): Engine {
     },
 
     get current(): number {
-      return Math.round(displayIndex)
+      return Math.round(phys.s)
     },
     get state(): CameraStateName {
-      return state
+      return stateLabel()
+    },
+    get displayIndex(): number {
+      return phys.s
+    },
+    get target(): number {
+      return anchor
     },
     path,
+    rebuild(next: readonly Stop[]): void {
+      path = buildPath(next)
+      last = path.last
+      anchor = clamp(anchor, 0, last)
+      phys = { s: clamp(phys.s, 0, last), v: 0 }
+      settledIndex = clamp(settledIndex, 0, last)
+      velocity = 0
+      inputForce = 0
+      emitFrame()
+    },
   }
 }

@@ -91,3 +91,19 @@ export function wake(): void {
 export function isRunning(): boolean {
   return frame !== 0 || callbacks.size > 0
 }
+
+/**
+ * 清空所有订阅与待执行帧。**仅用于测试**。
+ *
+ * 订阅表是模块级单例，测试之间共享；漏掉 detach 会让上一个测试的引擎继续
+ * 响应下一个测试的 rAF，产生「单独跑通过、一起跑失败」的幽灵问题。
+ * 生产代码不应调用它。
+ */
+export function resetForTests(): void {
+  callbacks.clear()
+  if (frame !== 0) {
+    cancelAnimationFrame(frame)
+    frame = 0
+  }
+  lastTime = 0
+}

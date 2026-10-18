@@ -17,7 +17,7 @@ WemZone 要的四件事与它**正面冲突**：
 | 切换时先慢后快再慢 | 需要按时间走的补间，scrub 是位置驱动 |
 | 无滚动时相机持续轻微晃动 | 需要常驻时间驱动的动画，正是它明令禁止的 |
 
-所以驱动模型换成「意图识别 → 状态机 → 弹簧/补间 → 摄像机状态」。
+所以驱动模型换成「意图识别 → 连续力学 → 摄像机状态」。
 但**「状态 → 画面」那一层纯函数映射可以完整继承** —— `src/lib/ease.ts` 从
 Celestial-Web 原样复制，零改动。
 
@@ -26,9 +26,9 @@ Celestial-Web 原样复制，零改动。
 ## 一、分层与数据流
 
 ```
-input.ts ──Intent──▶ camera.ts (状态机) ──displayIndex──▶ spatial.ts ──CameraPose──▶ world.ts
-  wheel/touch/key      IDLE/PULL/TRANSIT/SETTLE              centripetal CR      1 次 transform 写入
-  spring.ts (PULL) / tween.ts (TRANSIT)                                              └─▶ blur.ts
+input.ts ──Intent──▶ camera.ts (连续力学) ──displayIndex──▶ spatial.ts ──CameraPose──▶ world.ts
+  wheel/touch/key       s, v, anchor, inputForce             centripetal CR      1 次 transform 写入
+  physics.ts（a = 势能 + 阻尼 + 锚定 + 输入）                                        └─▶ blur.ts
   idle.ts（CSS 动画，合成线程，与 rAF 解耦）
 ```
 
@@ -159,53 +159,104 @@ z 相关视差几乎看不见。
 
 ---
 
-## 五、状态机（`camera.ts`）
+## 五、连续力学（`physics.ts` / `camera.ts`）
 
-| 状态 | 含义 | 帧循环 |
-|---|---|---|
-| `IDLE` | 停在整数 index，只余 CSS 空闲晃动 | **不排 rAF**（零主线程开销） |
-| `PULL` | 微弱滚动给了弹簧冲量，相机偏离后回弹 | rAF 跑，弹簧解析积分 |
-| `TRANSIT` | 提交了 step，index 从 i 缓动到 i±1 | rAF 跑，补间 |
-| `SETTLE` | 补间到达后的短吸收 | rAF 跑 |
+**没有状态机。** 相机是一个受力运动的质点，整站只有一个方程：
 
-**踩过的两个坑**（由单元测试与浏览器插桩发现）：
+```
+a = F_势能 + F_阻尼 + F_锚定 + F_输入
+```
 
-1. **`IDLE` 必须 `return false`**。初版漏了 `else` 分支，IDLE 会一路落到
-   末尾的 `return true`，循环永不停止 —— 整个「静止零开销」的设计失效。
-2. **循环停掉后必须能重新唤醒**。回调返回 false 后循环停止，但回调**仍留在
-   集合里**；若 `ensureFrame()` 用 `if (stopFrame) return` 直接返回，
-   引擎在第一次转场后就永久死掉了。解法是 `scheduler.ts` 导出 `wake()`，
-   `ensureFrame()` 在已注册时改调 `wake()`。
+果冻回弹、切换、落位都是它的不同能量状态，不是不同代码路径。
 
-### 边界
+### 势能：每个区块中心是一个吸引中心
 
-index 0 处 `step(−1)`、index last 处 `step(+1)` → 不转移，改发一次 `pull`
-（橡皮筋回弹），给用户「到头了」的反馈。
+```
+U(s) = (k / (2π)²) · (1 − cos 2πs)
+F(s) = −dU/ds = −(k / 2π) · sin(2πs)
+```
+
+极小值在整数 `s`（区块中心），极大值在半整数（区块之间）。
+近井底时 `F ≈ −k·(s − i)`，是标准谐振子，`ω = √k`。
+
+**为什么用周期余弦而不是对每个中心求 `1/r²` 引力**：`1/r²` 在中心处发散，
+数值上会把相机吸成一个点；有限个中心的引力不周期，边缘区块的平衡点会偏移。
+余弦势是「一整个晶格的中心」的平滑极限，形状一致、处处可导、无奇点。
+
+### 两层职责：意图决定去哪，力学决定怎么走
+
+| 层 | 决定什么 |
+|---|---|
+| **意图**（`input.ts`） | 目标井是哪个。一次手势最多 ±1，保证「一次滚动只走一格」 |
+| **力学**（`physics.ts`） | 怎么走过去。轨迹的「先慢后快再慢」全部来自方程本身 |
+
+**为什么需要「锚定」这一项**：纯物理阈值很诱人（滚得够猛就越过势垒），但实测不行 ——
+真实滚轮是一串离散冲量，间隔约 50ms，阻尼在这段时间里已经耗散掉大半能量。
+实测 k=30 时要连续 8 格才能勉强过去，而 k=20 时单次冲量要 dv=4.0，
+输入量与「一格」的对应关系完全失控。用户要求「一次滚动只走一格」，
+这个约束靠能量阈值**涌现**出来是不可控的（同样滚一格，快滚和慢滚差几倍）。
+
+所以分成两层：意图层定目标，力学层走过程。物理仍然是连续的、没有状态机，
+只是多了一个「目的地」。这没有削弱手感 —— 轨迹的「先慢后快再慢」全部来自方程。
+
+### 实测轨迹（k=45, c=12, ζ≈0.89）
+
+```
+t(ms)   s       v
+    0   0.000   0.000     ← 起步：速度从 0 加速
+   48   0.089   2.023
+  112   0.240   2.408     ← 峰值
+  176   0.387   2.209
+  240   0.520   2.023
+  304   0.645   1.928
+  432   0.867   1.481
+  560   0.992   0.578     ← 开始减速
+  624   1.014   0.231     ← 轻微过冲（2%）
+  752   1.017  -0.073     ← 回弹
+ 1008   1.000  -0.025     ← 落位
+```
+
+总时长约 1.04 秒。过冲只有 2%，回弹很克制 —— 这就是 ζ≈0.89 的「果冻」。
+
+### 为什么用半隐式欧拉
+
+显式欧拉在弹簧系统上会随 dt 增大而发散。半隐式（先更新速度、再用新速度
+更新位置）对谐振子是无条件稳定的（辛积分器），实现只有两行。
+另外对 dt 做了子步切分，避免标签页切回来时一帧跨过好几个井。
+
+### 停帧
+
+当相机静止在目标井、且没有待处理输入力时，`tick` 返回 false 让 rAF 停下
+—— 这是「静止时主线程零开销」的实现。空闲晃动交给 CSS 合成动画（第七节）。
 
 ---
 
-## 六、弹簧与补间
+## 六、输入力与帧纪律（`input.ts` / `scheduler.ts`）
 
-**共用**帧循环 + 合成点 + dt 纪律（`dt = min(now − last, 100)`），
-**不共用**同一条曲线。
+### 滚动在力学里是「外力」，不是「位置」
 
-### PULL 用解析解弹簧-阻尼
+`pull` 意图不再直接改位移，而是往系统里注入力：
 
 ```
-x(t) = e^(-ζω₀t)·(A·cos(ω_d t) + B·sin(ω_d t)) + target,   ω_d = ω₀√(1−ζ²)
+inputForce += Δ · PULL_FORCE_GAIN        // 持续分量：按住滚轮时一直在推
+velocity   += Δ · PULL_IMPULSE_GAIN      // 冲量分量：一次事件给一下初速
 ```
 
-- **为什么不用欧拉积分**：欧拉积分手感随帧率变（60Hz 与 144Hz 过冲量不同），
-  除非每帧切子步。解析解对任意 dt 精确 —— 与 `chase()` 用半衰期而非
-  「每帧百分比」是同一条理由：帧率无关。单元测试验证了「一大步 ≈ 多小步」。
-- `ζ = 0.55`（欠阻尼，1–2 次可见回弹，就是「果冻」）；`ω₀ = 14 rad/s`（周期约 450ms）。
-- 冲量同时给位移与速度，于是「位移一下 → 弹回 → 过冲」。
+`inputForce` 以 **90ms 半衰期**指数衰减 —— 手指停下后力自然消失，
+相机随后只受势能与阻尼支配。这就是「位移一下再弹回」的来源：
+没有代码在检测「滚动结束了」，是力自己衰减掉了。
 
-### TRANSIT 用固定时长补间
+**为什么同时给力和冲量**：只给力则轻滚几乎无感（力在 90ms 内就衰减）；
+只给冲量则快速连滚的动能不叠加（每个事件都是独立的初速覆盖）。
+两者叠加后，缓慢滚动表现为「持续推、慢慢回」，快速滚动表现为「一下弹出去」。
 
-- **为什么不能用 `chase()`**：指数追赶只有「快 → 慢」，**没有「慢」的开头**，
-  而需求明确要「先慢后快再慢」。所以必须是固定时长 + ease-in-out。
-- `easeInOutCubic`，时长随提交速度调节（380–620ms）。轻轻推 → 舒展；猛滑 → 干脆。
+### 帧纪律
+
+`dt = min(now − last, 100)`，然后按 `substepCount()` 切成 ≤1/60s 的子步。
+上限 100ms 防止标签页切回来后一帧走完一整段路；子步保证大步长下数值稳定。
+
+**`dt` 用 `performance.now()` 而非帧计数** —— 与 `chase()` 用半衰期而非
+「每帧百分比」是同一条理由：手感与刷新率无关（60Hz / 144Hz / 120Hz 一致）。
 
 ---
 
@@ -282,3 +333,143 @@ Phase 2 会把 A/B 都做出来给用户对比，附实测帧率。
 | `tsconfig.node.json` 用 `noEmit` | TS6310：被引用的 project 不能禁用 emit | 改 `emitDeclarationOnly` + `outDir` |
 | 预览标签页后台节流 | rAF 降到 ~1fps，转场看起来要好几秒 | 用假时钟的单元测试验证，别信后台标签页的计时 |
 | 速度分支判「猛滑」 | 滚轮一格被当成猛滑，两格就翻页 | 判据是**粒度**不是速度：`TRACKPAD_MAX_EVENT_PX` |
+
+---
+
+## 十一、启动器组件库的 vendor 接线（Phase 1.5）
+
+目标：**渲染的必须是启动器本人**，不是仿制品。为此把上游的包以**源码**形式
+复制进 `src/vendor/`，让 WemZone 的构建链直接编译它们。
+
+### 11.1 搬了什么、没搬什么
+
+| 上游 | 落点 | 处理 |
+|---|---|---|
+| `packages/ui/src`（377 个 `.vue`） | `src/vendor/ui/` | 整体搬。删 `stories/`（120 文件）、除 `en-US` 外的 32 种语言 |
+| `packages/assets` | `src/vendor/assets/` | 整体搬（312 图标 + `omorphia.scss` + `styles/` + branding） |
+| `packages/utils` | `src/vendor/utils/` | 整体搬 |
+| `packages/api-client/src`（116 文件） | `src/vendor/api-client/` | 搬，删 `platform/tauri.ts`（见 11.4） |
+| `tooling-config/tailwind/tailwind-preset.ts` | `src/vendor/tooling/` | 原文搬入，只改 import 路径 |
+| `packages/blog` | `src/vendor/blog/changelog.ts` | **只补 4 行类型**。真包含 3.5MB 硬编码版本日志，且唯一引用是 `import type` |
+
+体积：`src/vendor/` 约 12MB（不含 `node_modules`），`ui/` 6MB、`assets/` 5.3MB。
+
+### 11.2 七条接线，缺一条就白屏或没样式
+
+**① `#ui/*` alias（229 个文件）**
+
+上游 `packages/ui/package.json` 有 `"imports": { "#ui/*": "./src/*" }`。
+vendor 后 `src/` 被拍平，所以 alias 指向 `src/vendor/ui/*`。
+`vite.config.ts` 与 `tsconfig.json` 的 `paths` **两处都要配** ——
+Vite 管构建、TS 管类型，少一个就是「能跑但编辑器满屏红」或反之。
+
+同一批 alias 还有 `@modrinth/{ui,assets,utils,api-client}`。
+**必须用正则**而不是字符串 find：字符串形式的 alias 在 `@modrinth/ui/src/x`
+这类子路径上会匹配错（`@modrinth/ui` 先命中，把 `/src/x` 当成子路径拼）。
+
+**② `vite-svg-loader` 的 svgoConfig 逐字节相同**
+
+```ts
+svgoConfig: { plugins: [{ name: 'preset-default', params: { overrides: {
+  removeViewBox: false,      // 去掉后 SVG 不能随容器缩放
+  cleanupIds: { minify: false }, // id 被重编号 → 同页多图标 <use>/clipPath 串味
+} } }] }
+```
+
+验收证据：演示页里图标 `viewBox="0 0 24 24"` 保留、渲染为 16px。
+
+**③ `sass` + `silenceDeprecations: ['import']`**
+
+`omorphia.scss` 及其 6 个子文件全用 legacy `@import`。不静默会刷几百行弃用警告。
+
+**④ Tailwind content glob 必须覆盖 vendor**
+
+最易漏，症状是「DOM 结构对、但完全没样式」——Tailwind 只扫描 `content`
+里出现过的类名来生成 CSS。`tailwind.config.ts` 里显式写了
+`./src/vendor/**/*.{vue,ts,js}`（虽然 `./src/**` 理论上已覆盖，显式写是为了
+文档化这条依赖，防止将来收窄 content 时静默失效）。
+
+**⑤ i18n：`vue-i18n@10` + `intl-messageformat` + `provideI18n()`**
+
+**203 个组件硬依赖 `useVIntl`，缺了直接 throw（不是静默降级）。**
+`useVIntl` 走的是自定义的 `I18N_INJECTION_KEY`，不是 vue-i18n 的 `useI18n` ——
+两个都要给：`app.use(i18n)` + `app.provide(I18N_INJECTION_KEY, context)`。
+消息用 `buildLocaleMessages()` + `createMessageCompiler()` 装配，
+后者是 `IntlMessageFormat` 的薄封装（ICU 语法，含复数/选择）。
+
+**⑥ Provider 全家桶**
+
+模板抄自 `packages/ui/.storybook/preview.ts` 的 `StorybookProvider`。
+**关键修正**：`provide()` 只能在组件 `setup()` 里调用，不能放在 `app.use()`
+旁边。初版写错时的症状是 5 条 `[Vue warn]: provide() can only be used inside setup()`
+＋ 组件注入时 throw。所以做成了 `LauncherUiProvider` 组件，包住所有用到
+vendor 组件的子树。
+
+用 `GenericModrinthClient`（ofetch，纯浏览器），不需要 Tauri。
+
+**⑦ FloatingVue 的两个 theme + teleport 目标 + ClientOnly**
+
+- `app.use(FloatingVue, { themes: { 'ribbit-popout': …, 'dismissable-prompt': … } })`
+  —— 这两个 theme 名写死在组件模板里，是硬依赖。
+- `<div id="teleports">` —— 组件里大量 `<Teleport to="#teleports">`。
+- `app.component('ClientOnly', …)` 与 `NuxtLink` —— Nuxt/Storybook 环境提供，
+  静态站没有。`RouterLink` **不要**手动注册（vue-router 已注册，会警告冲突）。
+
+### 11.3 样式加载顺序
+
+```
+main.css      Tailwind 指令 + WemZone 令牌 + 上游 tailwind-utilities.css
+launcher.scss omorphia.scss（variables → normalize → classes → defaults …）
+```
+
+`launcher.scss` **不含** `@tailwind` 指令 —— 两份 CSS 各写一遍会产出两套完整
+工具类。`tailwind-utilities.css` 含 `@layer utilities`，必须与
+`@tailwind utilities` 同处一份 CSS，所以也放在 `main.css` 里。
+
+**主题 class 必须挂 `<html class="dark-mode">`**：`variables.scss` 里
+`html` 默认套 `.light-properties`，只有 `.dark-mode` 才切到暗色令牌。
+不挂的症状是「组件结构对但颜色全反」。这是启动器组件的令牌选择，
+与 WemZone 自己的 `--brand-hue` 主题系统是两回事。
+
+### 11.4 vendor 差异清单（对上游源码的全部改动）
+
+1. **删 `platform/tauri.ts`** 及其两个导出。它静态 import `@tauri-apps/plugin-http`，
+   留着会让 Vite 解析失败；WemZone 只用 `GenericModrinthClient`。
+2. **修 `ServerListing.vue` 的相对路径**：`../../../../assets/generated-icons`
+   → `../../../assets/…`。上游从 `packages/ui/src/components/servers/` 出发是四级，
+   vendor 后少了一层 `src/`。
+3. **`@ts-nocheck`**：vendor 里所有 `.vue` 的 `<script>` 内与 `.ts` 文件首行。
+   **理由**：上游 `packages/ui` 从来没有类型检查脚本，消费端 app 的
+   `typecheck` 跑的又是根 `tsconfig.json`（`"files": []` + references）——
+   也就是说这 129 个类型错误在上游**一直存在，只是从未被检查到**。
+   在 vendor 处加 `@ts-nocheck` 只压制 vendor 内部，**WemZone 调用 vendor 的
+   类型检查仍然生效**（`VendorDemo.vue` 的 props 错误照样报出来）。
+   注：`<!-- @ts-nocheck -->` 在 SFC 顶层**无效**，必须放进 `<script>` 块内。
+4. **删 telemetry**：vendor 的 ui 里本就没有 `posthog`/`@sentry` 引用
+   （它们在 `apps/app-frontend` 页面层）。已确认零残留。
+5. **`@modrinth/blog`** 用 `src/vendor/blog/changelog.ts` 的 4 行类型替身。
+6. 删 `stories/`、非 `en-US` 语言、`.turbo/`、`node_modules` 软链、构建脚本。
+
+### 11.5 验收结果
+
+`src/components/VendorDemo.vue` 渲染了 vendor 的 `Button` / `IconButton` /
+`Toggle` / `IntlFormatted`，实测（DevTools 读取的计算样式）：
+
+| 检查点 | 结果 |
+|---|---|
+| 主题令牌 | `--surface-4: #34363c`、`--color-brand: #1bd96a`（启动器暗色原值） |
+| Button md | 高 28.8px、圆角 9.6px、字重 600、`inset 0 0 0 1px #42444a` 内阴影 |
+| 尺寸阶梯 | xs 22.4 / sm 25.6 / md 28.8 / lg 32 / xl 38.4px；xl 字重 800 |
+| 类型变体 | base=`--surface-4`、colored=`#1bd96a`、outlined 透明+蓝字、quiet 透明+`--color-base` |
+| SVG 图标 | `viewBox` 保留、随按钮尺寸渲染 16px |
+| 交互 | 点击计数 +1、`loading` 时 `disabled` 与 `aria-busy="true"` |
+| i18n | `IntlFormatted` 的 `label.yes` → `Yes` |
+
+`npm run build` 与 `npx vitest run`（64 测试）均通过。
+
+### 11.6 后续接页面时要注意
+
+- 任何用到 vendor 组件的子树**必须**包在 `<LauncherUiProvider>` 里。
+- 相机世界里的 section 是 `absolute` + 父级宽 0，内容块**必须显式给宽度**；
+  `max-width: 90vw` 这类百分比/视口单位在 0 宽包含块下会算出荒谬值。
+- 需要游戏版本/加载器下拉时调 `ensureTagsLoaded()`（懒加载，不阻塞首屏）。

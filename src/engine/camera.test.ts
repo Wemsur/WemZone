@@ -1,19 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createCamera, type Engine } from '@/engine/camera'
+import { CAMERA } from '@/engine/constants'
+import { resetForTests } from '@/lib/scheduler'
 import type { Stop } from '@/engine/types'
 
 /**
- * 相机状态机的确定性测试
+ * 相机 = 连续受力质点
  *
- * 用假的 requestAnimationFrame 手动推帧，于是「转场是否在配置时长内完成」
- * 「IDLE 是否真的停帧」这些都能精确断言，不受真实帧率 / 标签页可见性影响。
+ * 用假的 requestAnimationFrame 手动推帧，于是「切换是否在合理时长内完成」
+ * 「静止后是否停帧」这些都能精确断言，不受真实帧率 / 标签页可见性影响。
  */
 
 const stops: Stop[] = [
   { id: 'a', x: 0, y: 0, d: 34, rx: 0, ry: 0 },
-  { id: 'b', x: 26, y: -56, d: 34, rx: 0, ry: 0 },
-  { id: 'c', x: -26, y: -112, d: 34, rx: 0, ry: 0 },
+  { id: 'b', x: 26, y: 72, d: 34, rx: 0, ry: 0 },
+  { id: 'c', x: -26, y: 144, d: 34, rx: 0, ry: 0 },
 ]
 
 let rafCallbacks: Map<number, FrameRequestCallback>
@@ -33,7 +35,6 @@ beforeEach(() => {
     rafCallbacks.delete(id)
   })
   vi.stubGlobal('performance', { now: () => now })
-  // 输入层会读 window 上的 matchMedia / setTimeout，node 环境里给最小桩
   vi.stubGlobal('window', {
     addEventListener: () => {},
     removeEventListener: () => {},
@@ -46,9 +47,11 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  // 订阅表是模块级单例，测试之间共享 —— 必须清掉，
+  // 否则上一个测试的引擎会继续响应下一个测试的 pump()。
+  resetForTests()
 })
 
-/** 推一帧（dt 毫秒），返回是否还有后续帧被排。 */
 function pump(dtMs: number): boolean {
   now += dtMs
   const pending = [...rafCallbacks.entries()]
@@ -61,50 +64,82 @@ function makeEngine(): Engine {
   return createCamera({ stops, perspective: 120 })
 }
 
-describe('相机状态机', () => {
-  it('初始为 IDLE，且 attach 后很快停帧（静止零开销）', () => {
+/** 一直推到静止或超时，返回耗时（ms）。 */
+function settle(_cam: Engine, maxMs = 5000): number {
+  let elapsed = 0
+  while (elapsed < maxMs) {
+    const more = pump(16)
+    elapsed += 16
+    if (!more) break
+  }
+  return elapsed
+}
+
+describe('连续力学相机', () => {
+  it('初始静止在 0，且很快停帧（静止零开销）', () => {
     const cam = makeEngine()
     const detach = cam.attach()
-    expect(cam.state).toBe('IDLE')
-    // 推一帧：IDLE 应返回 false，于是不再排帧
+    expect(cam.current).toBe(0)
     const more = pump(16)
     expect(more).toBe(false)
     detach()
   })
 
-  it('step() 会唤醒已停的循环并完成转场', () => {
+  it('step() 会唤醒循环并走到目标井', () => {
     const cam = makeEngine()
     const detach = cam.attach()
-    pump(16) // 让循环停下
+    pump(16)
     expect(rafCallbacks.size).toBe(0)
 
     cam.step(1)
-    expect(cam.state).toBe('TRANSIT')
-    // 唤醒后应重新有帧在排队
     expect(rafCallbacks.size).toBeGreaterThan(0)
-
-    // 推足够多帧直到落位
-    let guard = 0
-    while (cam.state !== 'IDLE' && guard++ < 500) pump(16)
-    expect(cam.state).toBe('IDLE')
+    settle(cam)
     expect(cam.current).toBe(1)
+    expect(cam.displayIndex).toBeCloseTo(1, 6)
     detach()
   })
 
-  it('转场时长在配置范围内（380–700ms）', () => {
+  it('一次 step 恰好走一格（不会冲过头）', () => {
     const cam = makeEngine()
     const detach = cam.attach()
     pump(16)
     cam.step(1)
+    settle(cam)
+    expect(cam.current).toBe(1)
+    expect(cam.displayIndex).toBeLessThan(1.02)
+    detach()
+  })
 
-    let elapsed = 0
-    let guard = 0
-    while (cam.state !== 'IDLE' && guard++ < 500) {
-      pump(16)
-      elapsed += 16
-    }
-    expect(elapsed).toBeGreaterThanOrEqual(370)
-    expect(elapsed).toBeLessThanOrEqual(720)
+  it('切换在合理时长内完成（0.5–2.5 秒）', () => {
+    const cam = makeEngine()
+    const detach = cam.attach()
+    pump(16)
+    cam.step(1)
+    const ms = settle(cam)
+    expect(ms).toBeGreaterThan(400)
+    expect(ms).toBeLessThan(2500)
+    detach()
+  })
+
+  it('轨迹呈「先慢后快再慢」：中段速度最大', () => {
+    const cam = makeEngine()
+    const detach = cam.attach()
+    pump(16)
+
+    const speeds: number[] = []
+    const stop = cam.subscribe((f) => speeds.push(Math.abs(f.velocity)))
+    cam.step(1)
+    settle(cam)
+    stop()
+
+    // 去掉首尾的静止帧
+    const moving = speeds.filter((v) => v > 0.01)
+    expect(moving.length).toBeGreaterThan(10)
+
+    const peakIdx = moving.indexOf(Math.max(...moving))
+    // 峰值应在中段（不是第一帧、也不是最后一帧）
+    expect(peakIdx).toBeGreaterThan(0)
+    expect(peakIdx).toBeLessThan(moving.length - 1)
     detach()
   })
 
@@ -113,9 +148,9 @@ describe('相机状态机', () => {
     const detach = cam.attach()
     pump(16)
     cam.goTo(2)
-    let guard = 0
-    while (cam.state !== 'IDLE' && guard++ < 500) pump(16)
+    settle(cam)
     expect(cam.current).toBe(2)
+    expect(cam.displayIndex).toBe(2)
     detach()
   })
 
@@ -124,85 +159,61 @@ describe('相机状态机', () => {
     const detach = cam.attach()
     pump(16)
     cam.goTo(99)
-    let guard = 0
-    while (cam.state !== 'IDLE' && guard++ < 500) pump(16)
+    settle(cam)
     expect(cam.current).toBe(2)
     detach()
   })
 
-  it('边界处 step 越界退化为 pull（橡皮筋），不改变索引', () => {
+  it('边界处 step 越界不会改变目标', () => {
     const cam = makeEngine()
     const detach = cam.attach()
     pump(16)
-    // 已在索引 0，再往上应只弹不切
-    cam.dispatch({ kind: 'pull', delta: -120 })
-    expect(cam.state).toBe('PULL')
-    let guard = 0
-    while (cam.state !== 'IDLE' && guard++ < 500) pump(16)
+    cam.step(-1) // 已在 0
+    settle(cam)
     expect(cam.current).toBe(0)
+    expect(cam.target).toBe(0)
     detach()
   })
 
-  it('pull 是弹簧回弹：位移先偏离再归零，且会过冲', () => {
+  it('滚动（pull）是力：能量不足时回到原井（果冻）', () => {
     const cam = makeEngine()
     const detach = cam.attach()
     pump(16)
 
-    const ys: number[] = []
-    const stopSub = cam.subscribe((f) => ys.push(f.pose.y))
-    cam.dispatch({ kind: 'pull', delta: 200 })
+    let maxS = 0
+    const stop = cam.subscribe((f) => {
+      maxS = Math.max(maxS, f.index)
+    })
+    // 一个很小的滚动
+    cam.dispatch({ kind: 'pull', delta: 40 })
+    settle(cam)
+    stop()
 
-    let guard = 0
-    while (cam.state !== 'IDLE' && guard++ < 500) pump(16)
-    stopSub()
-
-    // 应偏离过静止位（0）——即出现过非零 y
-    expect(Math.max(...ys.map(Math.abs))).toBeGreaterThan(0.05)
-    // 最终回到 0
-    expect(Math.abs(ys[ys.length - 1])).toBeLessThan(0.01)
+    // 偏离了（看得见），但没有翻页
+    expect(maxS).toBeGreaterThan(0.002)
+    expect(cam.current).toBe(0)
+    expect(cam.displayIndex).toBe(0)
     detach()
   })
 
-  it('转场期间输入被锁定（再次 step 不改变目标）', () => {
-    const cam = makeEngine()
-    const detach = cam.attach()
-    pump(16)
-    cam.step(1)
-    expect(cam.state).toBe('TRANSIT')
-    // 立刻再 step：应被忽略（TRANSIT 期间 input.lock）
-    cam.dispatch({ kind: 'step', dir: 1, speed: 0 })
-    let guard = 0
-    while (cam.state !== 'IDLE' && guard++ < 500) pump(16)
-    expect(cam.current).toBe(1)
-    detach()
-  })
-
-  it('onSettle 只在落到新整数索引时触发', () => {
-    const cam = makeEngine()
-    const detach = cam.attach()
-    pump(16)
-    const settled: number[] = []
-    cam.onSettle((i) => settled.push(i))
-    cam.step(1)
-    let guard = 0
-    while (cam.state !== 'IDLE' && guard++ < 500) pump(16)
-    expect(settled).toEqual([1])
-    detach()
-  })
-
-  it('落位后速度归零（否则 Phase 2 的模糊会卡住）', () => {
-    const cam = makeEngine()
-    const detach = cam.attach()
-    pump(16)
-    cam.step(1)
-    let guard = 0
-    while (cam.state !== 'IDLE' && guard++ < 500) pump(16)
-    let last = 1
-    const stopSub = cam.subscribe((f) => (last = f.velocity))
-    pump(16)
-    stopSub()
-    expect(Math.abs(last)).toBeLessThan(1e-6)
-    detach()
+  it('更大的滚动给更多能量（偏离更远）', () => {
+    const measure = (delta: number): number => {
+      const cam = makeEngine()
+      const detach = cam.attach()
+      pump(16)
+      let maxS = 0
+      const stop = cam.subscribe((f) => {
+        maxS = Math.max(maxS, f.index)
+      })
+      cam.dispatch({ kind: 'pull', delta })
+      settle(cam)
+      stop()
+      detach()
+      return maxS
+    }
+    const small = measure(50)
+    const big = measure(200)
+    expect(big).toBeGreaterThan(small)
   })
 
   it('goTo immediate 也会通知落位（深链接刷新后 HUD/hash 要跟着变）', () => {
@@ -217,26 +228,51 @@ describe('相机状态机', () => {
   })
 
   it('attach 幂等：重复 attach 不会让一次 step 走多格', () => {
-    // 回归测试：开发时 HMR 会反复重建组件，若 attach 每次都叠一个 window
-    // 监听，一次按键会被处理 N 次（按一下跳好几格）。
     const cam = makeEngine()
     cam.attach()
     cam.attach()
     cam.attach()
-
-    // 直接派发意图，模拟「输入层收到一次事件」
     cam.step(1)
-    let guard = 0
-    while (cam.state !== 'IDLE' && guard++ < 500) pump(16)
-
-    // 只应走一格
+    settle(cam)
     expect(cam.current).toBe(1)
+  })
+
+  it('onSettle 只在落到新整数索引时触发', () => {
+    const cam = makeEngine()
+    const detach = cam.attach()
+    pump(16)
+    const settled: number[] = []
+    cam.onSettle((i) => settled.push(i))
+    cam.step(1)
+    settle(cam)
+    expect(settled).toEqual([1])
+    detach()
+  })
+
+  it('落位后速度归零（否则运动模糊会卡住）', () => {
+    const cam = makeEngine()
+    const detach = cam.attach()
+    pump(16)
+    cam.step(1)
+    settle(cam)
+    let last = 1
+    const stop = cam.subscribe((f) => (last = f.velocity))
+    pump(16)
+    stop()
+    expect(Math.abs(last)).toBeLessThan(1e-6)
+    detach()
+  })
+
+  it('物理参数处于合理区间', () => {
+    // ζ = c / (2√k)，要在 0.6–1.2 之间：太低会振荡多次，太高会显得迟钝
+    const zeta = CAMERA.PHYSICS_DAMPING / (2 * Math.sqrt(CAMERA.PHYSICS_K))
+    expect(zeta).toBeGreaterThan(0.6)
+    expect(zeta).toBeLessThan(1.2)
   })
 })
 
-describe('相机状态机 · 减少动效', () => {
-  it('prefers-reduced-motion 时 step 直接落位，不经过 TRANSIT', () => {
-    // 覆盖 matchMedia：让 reduce 为真
+describe('减少动效', () => {
+  it('prefers-reduced-motion 时 step 直接落位，不经过运动', () => {
     vi.stubGlobal('window', {
       addEventListener: () => {},
       removeEventListener: () => {},
@@ -249,13 +285,13 @@ describe('相机状态机 · 减少动效', () => {
     const cam = makeEngine()
     const detach = cam.attach()
     cam.step(1)
-    // 直接到 IDLE，没有中间态
     expect(cam.state).toBe('IDLE')
     expect(cam.current).toBe(1)
+    expect(cam.displayIndex).toBe(1)
     detach()
   })
 
-  it('prefers-reduced-motion 时 pull 被忽略（无果冻）', () => {
+  it('prefers-reduced-motion 时 pull 被忽略', () => {
     vi.stubGlobal('window', {
       addEventListener: () => {},
       removeEventListener: () => {},
@@ -268,6 +304,7 @@ describe('相机状态机 · 减少动效', () => {
     const cam = makeEngine()
     const detach = cam.attach()
     cam.dispatch({ kind: 'pull', delta: 200 })
+    expect(cam.displayIndex).toBe(0)
     expect(cam.state).toBe('IDLE')
     detach()
   })

@@ -13,3 +13,6 @@ Thumbs.db
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# 临时验证脚手架（不属于项目）
+.tmp-verify
