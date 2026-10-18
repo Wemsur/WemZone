@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import BlurDebugPanel from '@/components/BlurDebugPanel.vue'
 import MobileWorld from '@/components/MobileWorld.vue'
+import VendorDemo from '@/components/VendorDemo.vue'
 import World from '@/components/World.vue'
 import { provideCamera } from '@/composables/useCamera'
 import { useDeepLink } from '@/composables/useDeepLink'
@@ -51,7 +52,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 <template>
   <MobileWorld v-if="narrow">
     <template v-for="section in ACTIVE_SECTIONS" :key="section.id" #[section.id]>
-      <div class="placeholder">
+      <!-- Phase 1.5 验收：首页临时挂 vendor 组件演示，Phase 4 换成真内容 -->
+      <VendorDemo v-if="section.id === 'home'" />
+      <div v-else class="placeholder">
         <span class="placeholder-index">{{ section.label }}</span>
       </div>
     </template>
@@ -59,7 +62,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
   <World v-else :blur-mode="effectiveBlur">
     <template v-for="section in ACTIVE_SECTIONS" :key="section.id" #[section.id]>
-      <div class="placeholder">
+      <VendorDemo v-if="section.id === 'home'" />
+      <div v-else class="placeholder">
         <span class="placeholder-index">{{ section.label }}</span>
       </div>
     </template>

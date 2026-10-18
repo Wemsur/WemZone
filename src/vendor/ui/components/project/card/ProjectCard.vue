@@ -1,0 +1,482 @@
+<template>
+	<SmartClickable class="w-full project-card-container">
+		<template v-if="link" #clickable>
+			<AutoLink
+				:to="link"
+				class="rounded-xl no-outline no-click-animation custom-focus-indicator"
+				@mouseenter="$emit('mouseenter')"
+				@mouseleave="$emit('mouseleave')"
+			></AutoLink>
+		</template>
+		<div v-if="layout === 'grid'" :class="[baseCardStyle, 'flex flex-col']" :style="sourceTintStyle">
+			<div
+				:style="{ '--_project-color': cssColor }"
+				class="relative bg-project-gradient overflow-clip aspect-[2/1] w-full border-0 border-b-[1px] border-solid border-surface-4"
+			>
+				<img
+					v-if="banner"
+					:src="banner"
+					alt=""
+					class="absolute w-full h-full inset-0 object-cover object-center"
+				/>
+				<img
+					v-else
+					src="https://cdn.modrinth.com/landing-new/landing.webp"
+					alt=""
+					class="absolute w-full h-full inset-0 object-cover object-center placeholder-banner scale-[200%]"
+				/>
+			</div>
+			<div class="p-4 flex flex-col gap-3 grow">
+				<div class="flex gap-3">
+					<Avatar :src="iconUrl" size="96px" class="project-card__icon ease-brightness" no-shadow />
+					<div class="flex flex-col gap-2 w-full">
+						<div class="grid grid-cols-[1fr_auto] gap-4">
+							<div class="flex flex-col gap-1">
+								<div class="flex gap-2 items-center">
+									<ProjectCardTitle :title="title" compact />
+									<ProjectCardAuthor v-if="author" :author="author" />
+									<ProjectStatusBadge v-if="status" :status="status" class="text-sm" />
+								</div>
+								<div class="m-0 font-normal line-clamp-2">
+									{{ summary }}
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="flex gap-2 shrink-0 empty:hidden smart-clickable:allow-pointer-events">
+					<slot name="actions" />
+				</div>
+				<div class="mt-auto flex flex-col gap-3 flex-wrap overflow-hidden justify-between grow">
+					<div class="flex items-center gap-1 flex-wrap overflow-hidden">
+						<ProjectCardSourceTag
+							v-if="sourceTag"
+							:label="sourceTag.label"
+							:color="sourceTag.color"
+							:icon-url="sourceTag.iconUrl"
+							:is-modrinth="sourceTag.isModrinth"
+						/>
+						<template v-if="isServerProject">
+							<ServerOnlinePlayers
+								v-if="serverOnlinePlayers !== undefined"
+								:online="serverOnlinePlayers"
+								:status-online="serverStatusOnline"
+								:hide-label="true"
+							/>
+							<ServerRecentPlays
+								v-if="serverRecentPlays !== undefined"
+								:recent-plays="serverRecentPlays"
+								:hide-label="true"
+							/>
+							<ServerPing v-if="serverPing && serverStatusOnline" :ping="serverPing" />
+							<ServerRegion
+								v-if="serverRegion"
+								:region="serverRegion"
+								class="smart-clickable:allow-pointer-events"
+							/>
+						</template>
+						<ProjectCardEnvironment v-if="environment" :environment="environment" />
+						<ProjectCardTags
+							v-if="tags"
+							:tags="tags"
+							:exclude-loaders="excludeLoaders"
+							:deprioritized-tags="deprioritizedTags"
+							:max-tags="(maxTags || 6) + (!!environment ? 0 : 1)"
+						/>
+						<ServerModpackContent
+							v-if="serverModpackContent"
+							:name="serverModpackContent.name"
+							:icon="serverModpackContent.icon"
+							:onclick="serverModpackContent.onclick"
+							:show-custom-modpack-tooltip="serverModpackContent.showCustomModpackTooltip"
+							class="text-primary"
+						/>
+					</div>
+					<div
+						v-if="downloads !== undefined || followers !== undefined"
+						class="flex items-center gap-3 justify-between flex-wrap"
+					>
+						<div class="flex items-center gap-3 no-wrap flex-wrap">
+							<ProjectCardStats :downloads="downloads" :followers="followers" />
+						</div>
+						<ProjectCardDate v-if="date && autoDisplayDate" :type="autoDisplayDate" :date="date" />
+					</div>
+				</div>
+			</div>
+		</div>
+		<div
+			v-else
+			:class="[
+				baseCardStyle,
+				'p-4 grid grid-project-card-list gap-x-3 gap-y-2',
+				{ 'has-actions': !!$slots.actions },
+			]"
+			:style="sourceTintStyle"
+		>
+			<Avatar
+				:src="iconUrl"
+				size="100px"
+				class="project-card__icon grid-project-card-list__icon ease-brightness"
+				no-shadow
+			/>
+			<div class="flex flex-col gap-2 grid-project-card-list__info">
+				<div class="flex gap-2 items-center">
+					<ProjectCardTitle :title="title" />
+					<ProjectCardAuthor v-if="author" :author="author" />
+					<ProjectStatusBadge v-if="status" :status="status" />
+				</div>
+				<div class="project-card-summary m-0 font-normal line-clamp-2">
+					{{ summary }}
+				</div>
+			</div>
+
+			<div
+				v-if="!!$slots.actions"
+				class="flex gap-1 shrink-0 ml-auto empty:hidden smart-clickable:allow-pointer-events grid-project-card-list__actions"
+			>
+				<slot name="actions" />
+			</div>
+			<div
+				class="flex flex-col gap-3 items-end shrink-0 ml-auto empty:hidden grid-project-card-list__stats"
+				:class="{ 'mt-3': !!$slots.actions }"
+			>
+				<div
+					v-if="downloads !== undefined || followers !== undefined"
+					class="flex items-center gap-3"
+				>
+					<ProjectCardStats :downloads="downloads" :followers="followers" />
+				</div>
+				<ProjectCardDate v-if="date && autoDisplayDate" :type="autoDisplayDate" :date="date" />
+			</div>
+			<div class="mt-auto flex items-center gap-3 grid-project-card-list__tags">
+				<div class="flex items-center gap-2 w-full">
+					<ProjectCardSourceTag
+						v-if="sourceTag"
+						:label="sourceTag.label"
+						:color="sourceTag.color"
+						:icon-url="sourceTag.iconUrl"
+						:is-modrinth="sourceTag.isModrinth"
+					/>
+					<template v-if="isServerProject">
+						<ServerOnlinePlayers
+							v-if="serverOnlinePlayers !== undefined"
+							:online="serverOnlinePlayers"
+							:status-online="serverStatusOnline"
+							:hide-label="true"
+						/>
+						<ServerRecentPlays
+							v-if="serverRecentPlays !== undefined"
+							:recent-plays="serverRecentPlays"
+							:hide-label="true"
+						/>
+					</template>
+					<div class="flex items-center gap-1">
+						<template v-if="isServerProject">
+							<ServerPing v-if="serverPing && serverStatusOnline" :ping="serverPing" />
+							<ServerRegion
+								v-if="serverRegion"
+								:region="serverRegion"
+								class="smart-clickable:allow-pointer-events"
+							/>
+						</template>
+						<ProjectCardEnvironment v-if="environment" :environment="environment" />
+						<ProjectCardTags
+							v-if="tags"
+							:tags="tags"
+							:extra-tags="extraTags"
+							:exclude-loaders="excludeLoaders"
+							:deprioritized-tags="deprioritizedTags"
+							:max-tags="(maxTags || (!!$slots.actions ? 4 : 5)) + (!!environment ? 0 : 1)"
+						/>
+					</div>
+					<ServerModpackContent
+						v-if="serverModpackContent"
+						:name="serverModpackContent.name"
+						:icon="serverModpackContent.icon"
+						:onclick="serverModpackContent.onclick"
+						:show-custom-modpack-tooltip="serverModpackContent.showCustomModpackTooltip"
+						class="text-primary"
+					/>
+				</div>
+			</div>
+		</div>
+	</SmartClickable>
+</template>
+
+<script setup lang="ts">
+// @ts-nocheck
+import type { ProjectStatus } from '@modrinth/utils'
+import dayjs from 'dayjs'
+import { computed } from 'vue'
+import type { RouteLocationRaw } from 'vue-router'
+
+import { AutoLink, Avatar } from '../../base'
+import { SmartClickable } from '../../base/index.ts'
+import ProjectStatusBadge from '../ProjectStatusBadge.vue'
+import ServerModpackContent from '../server/ServerModpackContent.vue'
+import ServerOnlinePlayers from '../server/ServerOnlinePlayers.vue'
+import ServerPing from '../server/ServerPing.vue'
+import ServerRecentPlays from '../server/ServerRecentPlays.vue'
+import ServerRegion from '../server/ServerRegion.vue'
+import ProjectCardAuthor from './ProjectCardAuthor.vue'
+import ProjectCardDate from './ProjectCardDate.vue'
+import ProjectCardEnvironment, {
+	type ProjectCardEnvironmentValue,
+} from './ProjectCardEnvironment.vue'
+import ProjectCardStats from './ProjectCardStats.vue'
+import ProjectCardSourceTag from './ProjectCardSourceTag.vue'
+import ProjectCardTags from './ProjectCardTags.vue'
+import ProjectCardTitle from './ProjectCardTitle.vue'
+
+defineEmits<{
+	mouseenter: []
+	mouseleave: []
+}>()
+
+const props = defineProps<{
+	layout: 'list' | 'grid'
+	link?: string | RouteLocationRaw | (() => void)
+	iconUrl?: string
+	title: string
+	author?: {
+		name: string
+		link?: string
+	}
+	summary?: string
+	tags?: string[]
+	allTags?: string[]
+	deprioritizedTags?: string[]
+	excludeLoaders?: boolean
+	downloads?: number
+	followers?: number
+	dateUpdated?: string
+	datePublished?: string
+	displayedDate?: 'updated' | 'published'
+	serverRegion?: string
+	serverOnlinePlayers?: number
+	serverStatusOnline?: boolean
+	serverRecentPlays?: number
+	serverPing?: number
+	serverModpackContent?: {
+		name: string
+		icon?: string
+		onclick?: () => void
+		showCustomModpackTooltip?: boolean
+	}
+	isServerProject?: boolean
+	banner?: string
+	color?: string | number
+	/** A content source's theme colour, tinting the card from its left edge. */
+	sourceColor?: string | null
+	/** Which content source the item came from, shown as a chip. */
+	sourceTag?: {
+		label: string
+		color?: string | null
+		iconUrl?: string | null
+		isModrinth?: boolean
+	} | null
+	environment?: ProjectCardEnvironmentValue
+	status?: ProjectStatus
+	maxTags?: number
+}>()
+
+const baseCardStyle =
+	'w-full h-full border-[1px] border-solid border-surface-4 overflow-hidden bg-surface-3 rounded-2xl transition-all smart-clickable:outline-on-focus smart-clickable:highlight-on-hover'
+
+const updatedDate = computed(() =>
+	props.dateUpdated ? dayjs(props.dateUpdated).toDate() : undefined,
+)
+const publishedDate = computed(() =>
+	props.datePublished ? dayjs(props.datePublished).toDate() : undefined,
+)
+
+const autoDisplayDate = computed(() => {
+	if (props.displayedDate) {
+		return props.displayedDate
+	} else if (props.dateUpdated) {
+		return 'updated'
+	} else if (props.datePublished) {
+		return 'published'
+	} else {
+		return undefined
+	}
+})
+
+const date = computed(() => {
+	if (autoDisplayDate.value === 'updated') {
+		return updatedDate.value
+	} else if (autoDisplayDate.value === 'published') {
+		return publishedDate.value
+	}
+	return undefined
+})
+
+const extraTags = computed(() => props.allTags?.filter((tag) => !props.tags?.includes(tag)))
+
+const cssColor = computed(() => {
+	if (props.color === undefined || typeof props.color === 'string') {
+		return props.color
+	}
+
+	const color = props.color >>> 0
+	const b = color & 0xff
+	const g = (color & 0xff00) >>> 8
+	const r = (color & 0xff0000) >>> 16
+	return 'rgba(' + [r, g, b, 1].join(',') + ')'
+})
+
+/**
+ * The source's colour laid over the card's own background, fading out by the
+ * card's middle. Set as a background-image rather than as an overlay element so
+ * it cannot paint over the card's contents, and so the card's own border radius
+ * clips it without anything extra.
+ */
+const sourceTintStyle = computed(() => {
+	const hex = props.sourceColor?.trim().replace('#', '')
+	if (!hex || hex.length !== 6) return undefined
+	const r = Number.parseInt(hex.slice(0, 2), 16)
+	const g = Number.parseInt(hex.slice(2, 4), 16)
+	const b = Number.parseInt(hex.slice(4, 6), 16)
+	if ([r, g, b].some(Number.isNaN)) return undefined
+	return {
+		backgroundImage: `linear-gradient(to right, rgba(${r}, ${g}, ${b}, 0.3), rgba(${r}, ${g}, ${b}, 0) 50%)`,
+	}
+})
+</script>
+<style scoped>
+.no-outline {
+	outline: none;
+}
+
+:deep(.project-card-container) {
+	container-type: inline-size;
+}
+
+.grid-project-card-list {
+	grid-template:
+		'icon info stats stats'
+		'icon info stats stats'
+		'icon tags tags tags';
+	grid-template-columns: auto 1fr auto auto;
+}
+
+.grid-project-card-list.has-actions {
+	grid-template:
+		'icon info actions actions'
+		'icon info dummy stats'
+		'icon tags tags stats';
+	grid-template-columns: auto 1fr auto auto;
+}
+
+.grid-project-card-list__icon {
+	grid-area: icon;
+}
+
+.grid-project-card-list__info {
+	grid-area: info;
+}
+
+.grid-project-card-list__actions {
+	grid-area: actions;
+}
+
+.grid-project-card-list__stats {
+	grid-area: stats;
+}
+
+.grid-project-card-list__tags {
+	grid-area: tags;
+}
+
+@container (width < 850px) {
+	.project-card__icon {
+		--_override-size: 64px;
+	}
+
+	.grid-project-card-list {
+		grid-template:
+			'icon info stats'
+			'icon info stats'
+			'tags tags tags';
+		grid-template-columns: auto 1fr auto;
+	}
+
+	.grid-project-card-list.has-actions {
+		grid-template:
+			'icon info actions'
+			'icon info stats'
+			'tags tags stats';
+		grid-template-columns: auto 1fr auto;
+	}
+}
+
+@container (width < 550px) {
+	.project-card__icon {
+		--_override-size: 64px;
+	}
+
+	.grid-project-card-list {
+		grid-template:
+			'icon info'
+			'icon info'
+			'tags tags'
+			'stats stats';
+		grid-template-columns: auto 1fr;
+	}
+
+	.grid-project-card-list.has-actions {
+		grid-template:
+			'icon info'
+			'icon info'
+			'tags tags'
+			'stats stats'
+			'actions actions';
+		grid-template-columns: auto 1fr;
+	}
+
+	.grid-project-card-list__stats,
+	.grid-project-card-list__actions {
+		@apply items-start w-full;
+	}
+
+	/* Only one column is left, so downloads, followers and the date share a single line. */
+	.grid-project-card-list__stats {
+		@apply flex-row flex-wrap items-center;
+	}
+
+	/*
+	 * ...and the actions get a row of their own, so let them use all of it. Equal
+	 * columns instead of flex-grow so any number of buttons splits the row evenly;
+	 * icon-only buttons have a fixed width and keep it.
+	 */
+	.grid-project-card-list__actions > :deep(*) {
+		@apply grid flex-1 grid-flow-col auto-cols-fr;
+	}
+
+	.grid-project-card-list__info {
+		@apply gap-0.5;
+	}
+
+	.project-card-summary {
+		@apply text-sm;
+	}
+}
+
+/*noinspection CssUnresolvedCustomProperty*/
+.bg-project-gradient {
+	--_gradient-start: var(--_project-color, #000);
+	--_gradient-end: var(--_project-color, #000);
+	@supports (background-color: oklch(from var(--_project-color, #000) l c h)) {
+		--_gradient-start: oklch(
+			from var(--_project-color, #000) calc(l * 0.8) calc(c * 0.8) calc(h + 15)
+		);
+		--_gradient-end: oklch(from var(--_project-color, #000) calc(l * 0.5) calc(c * 0.9) h);
+	}
+	background-color: var(--_gradient-start);
+	background-image: linear-gradient(to bottom right, var(--_gradient-start), var(--_gradient-end));
+}
+
+.placeholder-banner {
+	opacity: 0.7;
+}
+</style>

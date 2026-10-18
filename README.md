@@ -19,7 +19,7 @@ npm test           # 引擎单元测试
 |---|---|---|
 | Phase 0 | 脚手架（Vite + Vue 3 + TS + Tailwind 3 + SCSS） | ✅ 完成 |
 | Phase 1 | 相机引擎（占位方块，无真内容） | ✅ 完成 |
-| Phase 1.5 | vendor 启动器组件库，打通管线 | 待做 |
+| Phase 1.5 | vendor 启动器组件库，打通管线 | ✅ 完成 |
 | Phase 2 | 运动模糊 A/B 原型 + 基础交互 | 待做 |
 | Phase 3 | 背景系统 | 待做 |
 | Phase 4 | 内容填充 | 待做 |
@@ -47,3 +47,6 @@ npm test           # 引擎单元测试
 
 Vue 3.5 + Vite 6 + TypeScript + **Tailwind 3.4.19**（与 Celestial Launcher 同源，
 不是 Celestial-Web 的 v4）+ SCSS + Vitest。引擎是框架无关的 vanilla TS。
+
+启动器的 UI 组件库（`@modrinth/ui` 等）以源码形式 vendor 在 `src/vendor/`，
+接线方式见 [docs/DESIGN.md](docs/DESIGN.md) 第十一节。

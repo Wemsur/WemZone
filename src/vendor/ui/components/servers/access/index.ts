@@ -1,0 +1,8 @@
+// @ts-nocheck
+export { default as AccessTable } from './AccessTable.vue'
+export { default as AuditLogTable } from './AuditLogTable.vue'
+export * from './events'
+export { default as GrantAccessModal } from './GrantAccessModal.vue'
+export * from './permissions'
+export { default as RemoveAccessModal } from './RemoveAccessModal.vue'
+export * from './types'

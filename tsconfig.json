@@ -14,14 +14,24 @@
     "jsx": "preserve",
 
     "strict": true,
+    "noImplicitAny": false,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
 
-    "types": ["vite/client"],
+    "types": ["vite/client", "vite-svg-loader"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "#ui/*": ["./src/vendor/ui/*"],
+      "@modrinth/ui": ["./src/vendor/ui/index.ts"],
+      "@modrinth/ui/src/*": ["./src/vendor/ui/*"],
+      "@modrinth/assets": ["./src/vendor/assets/index.ts"],
+      "@modrinth/assets/*": ["./src/vendor/assets/*"],
+      "@modrinth/utils": ["./src/vendor/utils/index.ts"],
+      "@modrinth/utils/*": ["./src/vendor/utils/*"],
+      "@modrinth/api-client": ["./src/vendor/api-client/index.ts"],
+      "@modrinth/blog/changelog": ["./src/vendor/blog/changelog.ts"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue"],
