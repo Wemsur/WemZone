@@ -53,9 +53,16 @@ const DEG = Math.PI / 180
  * @param P       透视距离（rem）
  */
 export function renderPose(world: HTMLElement, pose: CameraPose, P: number): void {
-  // 世界绕视口中心旋转的角度 = 相机倾角的相反数
-  const a = -pose.rx * DEG
-  const b = -pose.ry * DEG
+  // **符号必须与下面 transform 里写的 rotateX/rotateY 完全一致。**
+  //
+  // 这里曾经用 `-pose.rx` 算补偿、却写 `rotateX(+pose.rx)` —— 两者反号，
+  // 旋转带来的深度位移不但没被抵消，反而翻倍。后果是：相机在转场中倾斜
+  // 3.2° 时，区块被放大约 46%，落位时又缩回去再弹一下，看起来就是
+  // 「到达后突然缩小再放大」。
+  //
+  // 补偿矩阵 R 就是 CSS 实际应用的 `rotateX(rx) rotateY(ry)`。
+  const a = pose.rx * DEG
+  const b = pose.ry * DEG
 
   // R·(px, py, 0)，R = rotateX(a) · rotateY(b)（与下面 transform 列表的顺序一致）
   const cosA = Math.cos(a)
