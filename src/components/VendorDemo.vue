@@ -86,7 +86,7 @@ function onClick(): void {
   gap: 1.25rem;
   padding: 1.5rem;
   border-radius: 1rem;
-  background: var(--surface-2);
+  background: color-mix(in srgb, var(--surface-2) 62%, transparent);
   border: 1px solid var(--surface-4);
 }
 

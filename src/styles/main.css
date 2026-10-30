@@ -149,6 +149,9 @@ body {
   position: fixed;
   inset: 0;
   overflow: hidden;
+  /* 区块背景在自己边缘渐隐到透明，露出的就是这一层。
+     取比各区背景更暗的颜色，渐隐处才像「融进黑暗」而不是露出灰底。 */
+  background: #0b0b0b;
 }
 
 /* 空闲晃动的两层包装。
@@ -203,6 +206,49 @@ body {
 }
 
 .world-section > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* 区块自己的背景。
+   **挂在区块里、跟着区块在 3D 世界里移动**，不是 screen-space 的全局背景。
+
+   尺寸远大于区块（160% × 185%），于是：
+   - 区块居中时视野里看不到背景边缘，不会出现黑边；
+   - 相邻区块的背景在区块之间重叠（区块间距 72rem，背景半高 54rem），
+     两条 mask 的渐隐区在重叠处互补，形成空间上的交叉淡入而不是硬切。
+
+   竖直方向的渐隐长度按互补关系算：半高 54rem、间距 72rem →
+   渐隐长度 = 2×54 − 72 = 36rem = 108rem 的 33.3%。 */
+.section-bg {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 160%;
+  height: 185%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  mask-image:
+    linear-gradient(to bottom, transparent 0%, #000 33.33%, #000 66.67%, transparent 100%),
+    linear-gradient(to right, transparent 0%, #000 18%, #000 82%, transparent 100%);
+  -webkit-mask-image:
+    linear-gradient(to bottom, transparent 0%, #000 33.33%, #000 66.67%, transparent 100%),
+    linear-gradient(to right, transparent 0%, #000 18%, #000 82%, transparent 100%);
+  mask-composite: intersect;
+  -webkit-mask-composite: source-in;
+}
+
+/* 内容层：压在背景之上 */
+.section-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: grid;
+}
+
+.section-content > * {
   grid-area: 1 / 1;
   min-width: 0;
   min-height: 0;

@@ -92,7 +92,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   place-items: center;
   border: 0.125rem solid var(--wz-brand);
   border-radius: var(--radius-card);
-  background: color-mix(in srgb, var(--wz-surface-3) 92%, transparent);
+  /* 半透明：背景是整站的主角之一，区块不能把它完全盖住 */
+  background: color-mix(in srgb, var(--wz-surface-3) 45%, transparent);
   box-shadow: 0 0 4rem color-mix(in srgb, var(--wz-brand) 22%, transparent);
 }
 

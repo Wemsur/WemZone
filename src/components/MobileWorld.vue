@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
+import Background from '@/components/Background.vue'
 import { ACTIVE_SECTIONS } from '@/sections'
 
 /**
@@ -94,6 +95,11 @@ function sectionStyle(i: number): Record<string, string> {
       data-mobile-section
       :data-id="section.id"
     >
+      <!-- 背景跟着这一节滚动，与宽版同一套场景组件 -->
+      <div class="section-bg" aria-hidden="true">
+        <Background :kind="section.background" :hue="section.hue ?? 18" />
+      </div>
+
       <div class="mobile-inner" :style="sectionStyle(i)">
         <slot :name="section.id" :index="i" />
       </div>
@@ -107,6 +113,8 @@ function sectionStyle(i: number): Record<string, string> {
   inset: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  /* 区块背景渐隐处露出的底色 */
+  background: #0b0b0b;
   /* 一次滑动停一节。mandatory 保证不会停在两节之间 */
   scroll-snap-type: y mandatory;
   -webkit-overflow-scrolling: touch;
@@ -114,6 +122,7 @@ function sectionStyle(i: number): Record<string, string> {
 }
 
 .mobile-section {
+  position: relative;
   height: 100vh;
   /* 用 svh 兜住移动浏览器地址栏收起/展开导致的高度跳变 */
   height: 100svh;

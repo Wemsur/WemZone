@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 
+import Background from '@/components/Background.vue'
 import { useCamera } from '@/composables/useCamera'
 import { applyBlur, clearBlur, type BlurMode, type BlurTargets } from '@/engine/blur'
 import { CAMERA } from '@/engine/constants'
@@ -154,7 +155,15 @@ onBeforeUnmount(() => {
                 :data-id="section.id"
                 :style="{ ...sectionStyle(i), ...sectionSize() }"
               >
-                <slot :name="section.id" :index="i" />
+                <!-- 该区块自己的背景：在 3D 世界里跟着区块一起移动。
+                     尺寸比区块大，相邻区块的背景在区块之间重叠并交叉渐隐。 -->
+                <div class="section-bg" aria-hidden="true">
+                  <Background :kind="section.background" :hue="section.hue ?? 18" />
+                </div>
+
+                <div class="section-content">
+                  <slot :name="section.id" :index="i" />
+                </div>
               </section>
             </div>
           </div>
