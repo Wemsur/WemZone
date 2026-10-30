@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import MobileWorld from '@/components/MobileWorld.vue'
 import HomeSection from '@/components/sections/HomeSection.vue'
+import HomeTopBar from '@/components/sections/HomeTopBar.vue'
 import TuningPanel from '@/components/TuningPanel.vue'
 import World from '@/components/World.vue'
 import { provideCamera } from '@/composables/useCamera'
@@ -67,6 +68,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       </div>
     </template>
   </World>
+
+  <!-- 首页顶栏：screen-space，离开首页时上滑淡出 -->
+  <HomeTopBar v-if="!narrow" />
 
   <!-- 调试信息（Phase 2 临时，Phase 4/5 移除） -->
   <div v-if="showDebug" class="hud">
