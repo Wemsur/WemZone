@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useCamera } from '@/composables/useCamera'
 import type { BlurMode } from '@/engine/blur'
 import { CAMERA } from '@/engine/constants'
+import { getTimeScale, setTimeScale } from '@/engine/debug'
 
 /**
  * 调参面板（仅 DEV + 宽版）
@@ -96,7 +97,14 @@ const GROUPS: { title: string; knobs: Knob[] }[] = [
 
 /* ---- 持久化 ---- */
 
-const STORAGE_KEY = 'wemzone.tuning.v1'
+/**
+ * 存档键。**默认值大改时要升版本号。**
+ *
+ * 旧存档会静默覆盖新默认值 —— 实测过一次：`DISTANCE_JITTER: 8` 留在
+ * localStorage 里，把「距离恒定」的修复完全盖掉了，转场继续先缩后放。
+ * 升版本等于让旧存档失效，用户从新默认值开始。
+ */
+const STORAGE_KEY = 'wemzone.tuning.v2'
 
 /** 当前值与默认值的快照。默认值在模块加载时抓一次，用于「恢复默认」。 */
 const DEFAULTS: Record<string, number> = {}
@@ -194,29 +202,55 @@ async function copyExport(): Promise<void> {
   }
 }
 
+/* ---- 慢放（调试） ---- */
+
+/**
+ * 时间流速。1 = 正常，0.25 = 四倍慢放。
+ *
+ * 只影响引擎内部的时间（物理、力衰减、模糊、倾斜、空闲晃动），
+ * **不影响输入判定** —— 手势切分与阈值仍按真实时间走，所以你做的
+ * 还是同一次操作，只是它的动画被拉长了。
+ */
+const timeScale = ref(getTimeScale())
+
+const SPEED_PRESETS = [
+  { value: 1, label: '1×' },
+  { value: 0.5, label: '0.5×' },
+  { value: 0.25, label: '0.25×' },
+  { value: 0.1, label: '0.1×' },
+]
+
+function setSpeed(v: number): void {
+  setTimeScale(v)
+  timeScale.value = getTimeScale()
+}
+
 /* ---- HUD（低频） ---- */
 
 const hud = reactive({ index: 0, state: 'IDLE', speed: 0 })
 let hudTimer = 0
 
 function sampleHud(): void {
-  const f = camera.engine.displayIndex
-  hud.index = Math.round(f * 1000) / 1000
+  hud.index = Math.round(camera.engine.displayIndex * 1000) / 1000
   hud.state = camera.state.value
-  // velocity 不在公开接口里；用两次采样估速度太粗糙，直接读状态名即可。
-  hud.speed = 0
+  hud.speed = Math.round(camera.engine.speed * 100) / 100
 }
 
 onMounted(() => {
   load()
   // 载入存档后几何可能已经变了，重建一次
   camera.rebuildStops()
+  // HMR 后模块里的 timeScale 会重置为 1，但 <html> 上的 CSS 变量还在 ——
+  // 同步一次，免得「物理正常、空闲晃动却还是慢的」。
+  setSpeed(timeScale.value)
   hudTimer = window.setInterval(sampleHud, 120)
 })
 
 onBeforeUnmount(() => {
   if (hudTimer !== 0) window.clearInterval(hudTimer)
   if (rebuildTimer !== 0) window.clearTimeout(rebuildTimer)
+  // 面板消失（例如切到窄版）时恢复正常速度，别让整站留在慢放里。
+  setTimeScale(1)
 })
 
 const blur = computed({
@@ -229,10 +263,40 @@ const blur = computed({
   <aside class="tuner">
     <header class="tuner-head">
       <strong>调参面板</strong>
-      <span class="mono">{{ hud.state }} · i={{ hud.index }}</span>
+      <span class="mono">{{ hud.state }} · i={{ hud.index }} · v={{ hud.speed }}</span>
     </header>
 
     <div class="tuner-body">
+      <section class="group slowmo">
+        <h3>慢放（调试）</h3>
+        <div class="seg">
+          <button
+            v-for="p in SPEED_PRESETS"
+            :key="p.value"
+            :class="{ on: Math.abs(timeScale - p.value) < 1e-6 }"
+            @click="setSpeed(p.value)"
+          >
+            {{ p.label }}
+          </button>
+        </div>
+        <label class="knob">
+          <span class="knob-label">时间流速</span>
+          <input
+            type="range"
+            min="0.02"
+            max="1"
+            step="0.01"
+            :value="timeScale"
+            @input="setSpeed(Number(($event.target as HTMLInputElement).value))"
+          />
+          <span class="knob-num readout">{{ timeScale.toFixed(2) }}×</span>
+        </label>
+        <p class="note">
+          只放慢引擎的时间（物理、力衰减、模糊、倾斜、空闲晃动），
+          <strong>输入判定仍是真实时间</strong> —— 照常做一次操作，看它的动画被拉长。
+        </p>
+      </section>
+
       <section v-for="group in GROUPS" :key="group.title" class="group">
         <h3>{{ group.title }}</h3>
 
@@ -357,6 +421,31 @@ const blur = computed({
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 慢放区高亮：它是调试开关，和设计参数不是一类东西 */
+.slowmo {
+  margin: 0.5rem 0 0.25rem;
+  padding: 0.5rem 0.625rem 0.625rem;
+  border: 1px solid var(--wz-surface-4);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--wz-surface-1) 70%, transparent);
+}
+
+.slowmo h3 {
+  margin-bottom: 0.5rem;
+}
+
+.slowmo .seg {
+  margin-bottom: 0.375rem;
+}
+
+.readout {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  border-color: transparent;
+  background: transparent;
 }
 
 input[type='range'] {

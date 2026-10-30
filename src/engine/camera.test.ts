@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createCamera, type Engine } from '@/engine/camera'
 import { CAMERA } from '@/engine/constants'
+import { setTimeScale } from '@/engine/debug'
 import { resetForTests } from '@/lib/scheduler'
 import type { Stop } from '@/engine/types'
 
@@ -50,6 +51,8 @@ afterEach(() => {
   // 订阅表是模块级单例，测试之间共享 —— 必须清掉，
   // 否则上一个测试的引擎会继续响应下一个测试的 pump()。
   resetForTests()
+  // 慢放是模块级状态，别泄漏到别的测试。
+  setTimeScale(1)
 })
 
 function pump(dtMs: number): boolean {
@@ -293,6 +296,34 @@ describe('连续力学相机', () => {
     const jumpPx = Math.abs(1 - lastMoving) * SCALE
     expect(jumpPx).toBeLessThan(0.1)
     detach()
+  })
+
+  it('慢放：轨迹形状不变，只是时长按比例拉长', () => {
+    const measure = (scale: number): { ms: number; peak: number } => {
+      setTimeScale(scale)
+      const cam = makeEngine()
+      const detach = cam.attach()
+      pump(16)
+      let peak = 0
+      const stop = cam.subscribe((f) => {
+        peak = Math.max(peak, f.index)
+      })
+      cam.step(1)
+      const ms = settle(cam, 20000)
+      stop()
+      detach()
+      return { ms, peak }
+    }
+
+    const normal = measure(1)
+    const slow = measure(0.25)
+
+    // 慢放 4 倍 → 时长约 4 倍。离散帧长（16ms vs 4ms）会让落位点差几帧，
+    // 实测约 4.7×，所以容差放到 3.3–5.0。
+    expect(slow.ms / normal.ms).toBeGreaterThan(3.3)
+    expect(slow.ms / normal.ms).toBeLessThan(5.0)
+    // 轨迹形状不变：过冲幅度基本一致
+    expect(Math.abs(slow.peak - normal.peak)).toBeLessThan(0.002)
   })
 
   it('物理参数处于合理区间', () => {

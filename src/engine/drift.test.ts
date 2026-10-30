@@ -81,7 +81,12 @@ describe('空闲晃动幅度', () => {
 
   it('两条动画的周期互质（合成拍频远大于单周期，看不出规律）', () => {
     const dur = (name: string): number => {
-      const re = new RegExp(`\\.${name}\\s*\\{[^}]*animation:\\s*${name}\\s+(\\d+)s`, 'm')
+      // 周期现在写成 `calc(11s / var(--wz-time-scale, 1))`，慢放开关靠这个
+      // 变量把时长拉长。正则要能同时接受裸 `11s` 和 calc 形式。
+      const re = new RegExp(
+        `\\.${name}\\s*\\{[^}]*animation:\\s*${name}\\s+(?:calc\\(\\s*)?(\\d+)s`,
+        'm',
+      )
       const m = css.match(re)
       if (!m) throw new Error(`找不到 .${name} 的 animation 定义`)
       return Number(m[1])

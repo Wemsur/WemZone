@@ -6,7 +6,7 @@ import {
   barrierHeight,
   potentialEnergy,
   potentialForce,
-  substepCount,
+  FIXED_STEP,
   type PhysicsParams,
 } from '@/engine/physics'
 
@@ -66,21 +66,18 @@ describe('积分器', () => {
     }
   })
 
-  it('大 dt 不会让位置爆炸（半隐式欧拉 + 子步）', () => {
-    const dt = 0.1 // 100ms，标签页切回来
-    const steps = substepCount(dt)
+  it('固定步长下推进 100ms 不会让位置爆炸（标签页切回来）', () => {
     let st = { s: 0, v: 0 }
-    const sub = dt / steps
-    for (let i = 0; i < steps; i++) st = advance(st, 1, 0, sub, P)
-    // 一个子步序列后位置应在合理范围（不会飞到 1e6）
+    const steps = Math.ceil(0.1 / FIXED_STEP)
+    for (let i = 0; i < steps; i++) st = advance(st, 1, 0, FIXED_STEP, P)
     expect(Number.isFinite(st.s)).toBe(true)
     expect(Math.abs(st.s)).toBeLessThan(10)
   })
 
-  it('子步数随 dt 增大', () => {
-    expect(substepCount(1 / 120)).toBe(1)
-    expect(substepCount(1 / 60)).toBe(1)
-    expect(substepCount(0.1)).toBeGreaterThanOrEqual(6)
+  it('固定步长足够小：数值阻尼可以忽略', () => {
+    // 240Hz。见 camera.ts 的说明：步长越大，半隐式欧拉的数值阻尼越明显，
+    // 过冲会随刷新率变化。
+    expect(FIXED_STEP).toBeLessThanOrEqual(1 / 240)
   })
 })
 

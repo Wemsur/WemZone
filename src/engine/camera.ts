@@ -28,11 +28,12 @@ import { onFrame, wake } from '@/lib/scheduler'
 import { prefersReducedMotion } from '@/lib/chase'
 
 import { CAMERA } from './constants'
+import { getTimeScale } from './debug'
 import { createInput, type InputSource } from './input'
 import {
   advance,
   atRest,
-  substepCount,
+  FIXED_STEP,
   type PhysicsParams,
   type PhysicsState,
 } from './physics'
@@ -65,6 +66,8 @@ export interface Engine {
   readonly state: CameraStateName
   /** 连续索引（含转场中的小数）。调参面板显示用。 */
   readonly displayIndex: number
+  /** 当前速度（索引/秒，按引擎时间）。调试显示用。 */
+  readonly speed: number
   /** 目标井（整数）。 */
   readonly target: number
   readonly path: CameraPath
@@ -92,6 +95,9 @@ export function createCamera(cfg: CameraConfig): Engine {
   let inputForce = 0
   /** 输入力的衰减半衰期（ms）：滚轮的一次冲量不该持续几秒 */
   const INPUT_FORCE_DECAY_MS = 90
+
+  /** 攒下来的模拟时间，跨帧保留（步长见 physics.ts 的 FIXED_STEP） */
+  let accumulator = 0
 
   /** 驱动运动模糊与动态倾斜：索引/秒 */
   let velocity = 0
@@ -174,17 +180,29 @@ export function createCamera(cfg: CameraConfig): Engine {
   /* ---- 帧循环 ---- */
 
   function tick(dtMs: number): boolean {
-    const dtSec = Math.min(dtMs, CAMERA.MAX_DT_MS) / 1000
+    // 慢放：真实 dt 先按上限钳住，再乘时间缩放。
+    const scaledMs = Math.min(dtMs, CAMERA.MAX_DT_MS) * getTimeScale()
     const p = physicsParams()
-    const steps = substepCount(dtSec)
-    const sub = dtSec / steps
 
-    for (let i = 0; i < steps; i++) {
-      phys = advance(phys, anchor, inputForce, sub, p)
+    // ---- 固定步长积分 ----
+    //
+    // 半隐式欧拉在步长变大时会**额外增加数值阻尼**：实测同一条切换，
+    // dt=16.7ms 的过冲是 1.03%，dt=1ms 是 2.67% —— 也就是说手感会随
+    // 刷新率变化，慢放时也会看到不一样的轨迹。
+    //
+    // 所以把模拟时间攒进累加器，永远用 FIXED_STEP 推进。这样
+    // 60Hz / 144Hz / 慢放 0.25× 得到的**轨迹完全一致**，只是真实时长不同。
+    // 慢放看到的过冲、落位、模糊，就是正常速度下真正发生的事。
+    accumulator += scaledMs / 1000
+    // 防止长时间卡顿（标签页切回）后一次补几千步
+    if (accumulator > 0.5) accumulator = 0.5
+
+    while (accumulator >= FIXED_STEP) {
+      phys = advance(phys, anchor, inputForce, FIXED_STEP, p)
+      // 输入力也按固定步长衰减，保证与帧率、慢放倍率都无关
+      inputForce *= Math.pow(2, -(FIXED_STEP * 1000) / INPUT_FORCE_DECAY_MS)
+      accumulator -= FIXED_STEP
     }
-
-    // 输入力按半衰期衰减（帧率无关）
-    inputForce *= Math.pow(2, -dtMs / INPUT_FORCE_DECAY_MS)
     if (Math.abs(inputForce) < 1e-3) inputForce = 0
 
     // 速度：索引/秒，供模糊与倾斜使用
@@ -367,6 +385,9 @@ export function createCamera(cfg: CameraConfig): Engine {
     },
     get displayIndex(): number {
       return phys.s
+    },
+    get speed(): number {
+      return velocity
     },
     get target(): number {
       return anchor

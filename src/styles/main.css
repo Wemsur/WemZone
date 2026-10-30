@@ -252,11 +252,13 @@ body {
 }
 
 .drift-outer {
-  animation: drift-outer 11s ease-in-out infinite alternate;
+  /* --wz-time-scale 由调试面板的慢放开关写入（1 = 正常）。
+     慢放时空闲晃动也跟着变慢，否则「所有动画一起慢放」不成立。 */
+  animation: drift-outer calc(11s / var(--wz-time-scale, 1)) ease-in-out infinite alternate;
 }
 
 .drift-inner {
-  animation: drift-inner 17s ease-in-out infinite alternate;
+  animation: drift-inner calc(17s / var(--wz-time-scale, 1)) ease-in-out infinite alternate;
 }
 
 @media (prefers-reduced-motion: reduce) {
