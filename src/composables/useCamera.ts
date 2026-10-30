@@ -105,6 +105,15 @@ export function provideCamera(): CameraApi {
   }
 
   provide(CAMERA_KEY, api)
+
+  /**
+   * DEV-only 调试入口。调参时可以直接在控制台里读连续索引 / 速度，
+   * 或者 `__camera.engine.goTo(3)` 跳区。生产构建会被 tree-shake 掉。
+   */
+  if (import.meta.env.DEV) {
+    ;(window as unknown as { __camera?: CameraApi }).__camera = api
+  }
+
   return api
 }
 

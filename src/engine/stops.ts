@@ -32,9 +32,14 @@ export function buildStops(): Stop[] {
       x: lateral,
       y: i * CAMERA.VERTICAL_SPACING,
       d: CAMERA.BASE_DISTANCE + distanceWobble(i),
-      // 轻微的静止基准倾角，让画面不显得完全「正对」
-      rx: i === 0 ? 0 : -1.2,
-      ry: lateral * 0.06,
+      // 静止基准倾角必须是 0。
+      //
+      // 区块要**铺满视野**，而倾斜的平面投影会变短：实测 rx=-1.2°、ry≈1.5°
+      // 时区块只占视口的 91%×92%，四周露出一圈背景，看起来又变成
+      // 「屏幕中间一张卡片」。3D 感由别的东西提供 —— 相机沿曲线运动、
+      // 速度驱动的动态倾斜（见 camera.ts）、以及空闲晃动。
+      rx: 0,
+      ry: 0,
     } satisfies Stop
   })
 }

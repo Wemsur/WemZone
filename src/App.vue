@@ -81,11 +81,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 <style scoped>
 /* Phase 1 的占位方块：刻意做得比最终设计显眼，
-   用来肉眼验证相机引擎（路径 / 弹簧 / 切换 / 晃动）。Phase 4 会被真内容替换。 */
+   用来肉眼验证相机引擎（路径 / 弹簧 / 切换 / 晃动）。Phase 4 会被真内容替换。
+
+   **尺寸交给 .world-section**（它按视野算宽高）。这里只管视觉，不设 width，
+   否则会把区块撑成内容尺寸、退回「屏幕中间一小块」。 */
 .placeholder {
-  width: 46rem;
-  max-width: 90%;
-  aspect-ratio: 16 / 9;
+  width: 100%;
+  height: 100%;
   display: grid;
   place-items: center;
   border: 0.125rem solid var(--wz-brand);

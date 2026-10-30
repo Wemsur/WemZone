@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 
 import { useCamera } from '@/composables/useCamera'
 import { applyBlur, clearBlur, type BlurMode, type BlurTargets } from '@/engine/blur'
@@ -59,18 +59,78 @@ onBeforeUnmount(() => {
   detach = null
 })
 
-/** 每个区块的静态 transform（位置 + 距离补偿），启动时算一次。
- *  调参面板改了几何参数后，`geometryVersion` 变化会让这里重算。 */
+/**
+ * 每个区块的静态 transform（位置 + 距离补偿），启动时算一次。
+ * 调参面板改了几何参数后，`geometryVersion` 变化会让这里重算。
+ */
 function sectionStyle(index: number): Record<string, string> {
   // 读取版本号建立响应式依赖（值本身不参与计算）。
   void camera.geometryVersion.value
   const stop = camera.engine.path.stops[index]
   return { transform: staticSectionTransform(stop, CAMERA.PERSPECTIVE) }
 }
+
+/**
+ * 让每个区块**占满视野**。
+ *
+ * 相机在距离 d 处看内容面时，可见世界范围是：
+ *
+ *     可见宽度(rem) = 视口宽(px) · d / P / 根字号(px)
+ *
+ * 但区块的静态 transform 里**已经带了** `scale(d/P)` 的距离补偿
+ * （见 engine/world.ts）。所以这里不能再乘一次 `d/P` ——
+ * 否则区块会被缩小两次，屏幕上只剩视野的 (d/P)²。
+ *
+ * 正确的写法是：区块在世界里占「一屏宽」（100vw 对应的 rem），
+ * 距离补偿把它投到屏幕上正好是一屏。于是任意窗口尺寸、任意相机距离下，
+ * 每个区块都恰好铺满视野。
+ */
+const probe = ref<HTMLElement | null>(null)
+const viewportRem = reactive({ w: 0, h: 0 })
+
+function measureViewport(): void {
+  if (!probe.value) return
+  const rootFont = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+  viewportRem.w = probe.value.clientWidth / rootFont
+  viewportRem.h = probe.value.clientHeight / rootFont
+}
+
+let resizeObserver: ResizeObserver | null = null
+
+/** 该区块内容应该占据的世界尺寸（rem）。 */
+function sectionSize(): Record<string, string> {
+  if (viewportRem.w === 0) return {}
+  // 出血：空闲晃动会把整个视口平移最多约 13px，转场时还有最多 3.2° 的动态
+  // 倾斜会让投影略微缩水。区块按 100% 给就会在晃动到极端时露出一条背景。
+  // 4% 的出血保证任何姿态下都铺满视野（内容外侧应留出安全边距）。
+  const k = 1.04
+  return {
+    width: `${(viewportRem.w * k).toFixed(3)}rem`,
+    height: `${(viewportRem.h * k).toFixed(3)}rem`,
+  }
+}
+onMounted(() => {
+  measureViewport()
+  if (typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(measureViewport)
+    if (probe.value) resizeObserver.observe(probe.value)
+  }
+  window.addEventListener('resize', measureViewport)
+})
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  resizeObserver = null
+  window.removeEventListener('resize', measureViewport)
+})
 </script>
 
 <template>
   <div id="stage">
+    <!-- 视野探针：一个 100vw × 100vh 的隐形盒子，只用来量「一屏等于多少 rem」。
+         放在 #viewport 外面，所以不受透视影响。 -->
+    <div ref="probe" class="viewport-probe" aria-hidden="true" />
+
     <!-- 模糊层：filter 是分组属性，会让这一层的 transform-style 变成 flat，
          而 flat 会**截断透视**（#viewport 的 perspective 传到这里就不再往下传）。
          所以它必须在 #viewport 的**外面** —— 3D 场景先正确渲染完，
@@ -92,7 +152,7 @@ function sectionStyle(index: number): Record<string, string> {
                 class="world-section"
                 :data-i="i"
                 :data-id="section.id"
-                :style="sectionStyle(i)"
+                :style="{ ...sectionStyle(i), ...sectionSize() }"
               >
                 <slot :name="section.id" :index="i" />
               </section>
@@ -118,6 +178,16 @@ function sectionStyle(index: number): Record<string, string> {
 .blur-layer {
   position: absolute;
   inset: 0;
+}
+
+/* 视野探针：只量尺寸，不参与渲染 */
+.viewport-probe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  visibility: hidden;
 }
 
 .blur-svg {

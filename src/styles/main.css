@@ -183,17 +183,29 @@ body {
   /* 由引擎每帧写入 transform，这里不设 will-change（见 engine/world.ts 的说明） */
 }
 
-/* 世界坐标里的一个内容块。位置由引擎在启动时写成内联 transform，静态不变。
+/* 世界坐标里的一个内容块。位置与尺寸由引擎写成内联 style。
    transform-origin 必须是 0 0：静态 transform 是
      translate3d(x, y, 0) scale(s) translate(-50%, -50%)
    只有在原点为左上角时，(x, y) 才正好落在**内容块的中心**、且缩放也绕中心
-   发生。改成 50% 50% 会让中心多偏移 (w/2, h/2)（见 engine/world.ts）。 */
+   发生。改成 50% 50% 会让中心多偏移 (w/2, h/2)（见 engine/world.ts）。
+
+   **区块按视野定尺寸**：World.vue 用探针量出「一屏等于多少 rem」，写进每个
+   section 的宽高（再留 4% 出血）。距离补偿 `scale(d/P)` 已经在内联 transform
+   里，所以屏幕上正好铺满视野。内容要填满这个盒子，而不是把它撑开 —— 否则
+   区块尺寸又会被内容反向决定，回到「屏幕中间一小块」。 */
 .world-section {
   position: absolute;
   left: 0;
   top: 0;
   transform-style: preserve-3d;
   transform-origin: 0 0;
+  display: grid;
+}
+
+.world-section > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+  min-height: 0;
 }
 
 /* ==========================================================================

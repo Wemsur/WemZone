@@ -108,6 +108,7 @@ export function createCamera(cfg: CameraConfig): Engine {
       k: CAMERA.PHYSICS_K,
       damping: CAMERA.PHYSICS_DAMPING,
       maxSpeed: CAMERA.PHYSICS_MAX_SPEED,
+      anchorSaturation: CAMERA.PHYSICS_ANCHOR_SATURATION,
     }
   }
 

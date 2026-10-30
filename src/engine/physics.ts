@@ -60,12 +60,17 @@ export interface PhysicsState {
 }
 
 export interface PhysicsParams {
-  /** 势能强度 k。近井底角频率 ω = √k */
+  /** 势能强度 k。近井底有效角频率 ω = √(2k)（势能 + 锚定两力叠加） */
   k: number
-  /** 阻尼系数 c。阻尼比 ζ = c / (2√k) */
+  /** 阻尼系数 c。有效阻尼比 ζeff = c / (2√(2k)) */
   damping: number
   /** 速度上限（索引/秒），防止极端输入把相机甩出去 */
   maxSpeed: number
+  /**
+   * 锚定力的饱和距离（索引）。见 `advance()` 里「为什么锚定力要饱和」。
+   * 不传则退化成线性锚定（旧行为）。
+   */
+  anchorSaturation?: number
 }
 
 /** 势能对 s 的负导数，也就是相机受到的「引力」。 */
@@ -97,8 +102,21 @@ export function advance(
   dtSec: number,
   p: PhysicsParams,
 ): PhysicsState {
-  // 锚定力：与势能同量纲（k × 位移），所以 k 同时控制「井的硬度」与「走过去的快慢」
-  const anchorForce = p.k * (anchor - state.s)
+  // ---- 锚定力：为什么它要饱和 ----
+  //
+  // 线性锚定 `k·(anchor − s)` 在 k 大时会**起步即巅峰**：k=350 时 33ms
+  // 就冲到 7.5 索引/秒，完全没有用户要求的「慢-快-慢」开头。
+  //
+  // 改成 `k·sat·tanh(d/sat)`：
+  //  - 近处（|d| ≪ sat）→ tanh(x) ≈ x，力仍是 k·d，**刚度不变**，
+  //    所以落位与果冻的手感不受影响；
+  //  - 远处（|d| ≫ sat）→ 力封顶在 k·sat，起步不会被猛推。
+  //
+  // 附带的好处是它更像真实的引力：距离越远力越大，但有上限。
+  const d = anchor - state.s
+  const sat = p.anchorSaturation
+  const anchorForce =
+    sat && sat > 0 ? p.k * sat * Math.tanh(d / sat) : p.k * d
 
   const a =
     potentialForce(state.s, p.k) - p.damping * state.v + anchorForce + inputForce
@@ -113,13 +131,41 @@ export function advance(
   return { s, v }
 }
 
+/**
+ * 是否已经静止到「可以安全吸附」的程度。
+ *
+ * ## 阈值必须按**像素**定，不能按索引拍脑袋
+ *
+ * 落位时引擎会把 `s` 直接吸附到整数索引。吸附量就是最后那一帧的视觉跳变，
+ * 所以阈值直接决定「会不会看到一下瞬移」。
+ *
+ * 换算关系（16px 根字号、透视 120rem、距离 34rem）：
+ *
+ *     屏幕放大 = P/(P−z) = 120/34 ≈ 3.53
+ *     1 索引   = 72rem = 1152px 世界坐标
+ *     1px 屏幕 ≈ 1 / (3.53 × 1152) ≈ 2.46e-4 索引
+ *
+ * 早先 `epsS = 2e-3`，吸附时最大跳 0.002 索引 ≈ **0.8px**，
+ * 用户会看到「最后一下突然吸过去」。现在取 1.5e-5（≈0.06px），肉眼不可见。
+ *
+ * **速度阈值也要一起收紧**：吸附跳变的上限其实是 `epsS + v·dt` ——
+ * 最后一个未吸附的帧可能只是「差一点点没过检查」，下一帧就跳过去了。
+ * 所以只压 `epsS` 不够，`epsV` 也压到 5e-4，实测最坏跳变约 0.067px。
+ *
+ * 代价是收敛尾巴多走一点（约 0.63s），所以同时把 k/c 调快
+ * （k=350 / c=32，ζeff≈0.60）：落位总时长约 0.63s，
+ * 轨迹仍是「起步慢 → 中段快 → 落位慢」，且中段带一次可见过冲。
+ */
+export const REST_EPS_S = 1.5e-5
+export const REST_EPS_V = 5e-4
+
 /** 是否已经静止在目标井。 */
 export function atRest(
   s: number,
   v: number,
   anchor: number,
-  epsS = 2e-3,
-  epsV = 2e-2,
+  epsS = REST_EPS_S,
+  epsV = REST_EPS_V,
 ): boolean {
   return Math.abs(v) < epsV && Math.abs(s - anchor) < epsS
 }

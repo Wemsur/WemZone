@@ -38,9 +38,10 @@ const GROUPS: { title: string; knobs: Knob[] }[] = [
   {
     title: '手感 · 力学',
     knobs: [
-      { key: 'PHYSICS_K', label: '势能强度 k', min: 5, max: 200, step: 1, hint: '越大越"紧"，切换越快' },
-      { key: 'PHYSICS_DAMPING', label: '阻尼 c', min: 0, max: 40, step: 0.5, hint: 'ζ = c / (2√k)；越小回弹越多' },
-      { key: 'PHYSICS_MAX_SPEED', label: '速度上限', min: 1, max: 20, step: 0.5 },
+      { key: 'PHYSICS_K', label: '势能强度 k', min: 5, max: 800, step: 5, hint: '越大越"紧"，切换越快；落位与果冻的硬度' },
+      { key: 'PHYSICS_DAMPING', label: '阻尼 c', min: 0, max: 120, step: 0.5, hint: 'ζeff = c/(2√(2k))；0.6 左右 = 一次可见过冲后收敛' },
+      { key: 'PHYSICS_ANCHOR_SATURATION', label: '锚定饱和距离', min: 0.05, max: 2, step: 0.05, hint: '越小起步越柔、整体越慢；越大越接近纯线性弹簧（起步猛）' },
+      { key: 'PHYSICS_MAX_SPEED', label: '速度上限', min: 1, max: 30, step: 0.5 },
     ],
   },
   {

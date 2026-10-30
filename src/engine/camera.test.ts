@@ -99,18 +99,29 @@ describe('连续力学相机', () => {
     detach()
   })
 
-  it('一次 step 恰好走一格（不会冲过头）', () => {
+  it('切换时会轻微过冲（用户要的「冲力」），但不会冲过头到下一格', () => {
     const cam = makeEngine()
     const detach = cam.attach()
     pump(16)
+
+    let maxIndex = 0
+    const stop = cam.subscribe((f) => {
+      maxIndex = Math.max(maxIndex, f.index)
+    })
     cam.step(1)
     settle(cam)
+    stop()
+
+    // 过冲必须看得见：约 1.2% 格距（约 50px 屏幕位移）
+    expect(maxIndex).toBeGreaterThan(1.005)
+    // 但不能逼近势垒（1.5）或跑进下一格
+    expect(maxIndex).toBeLessThan(1.05)
     expect(cam.current).toBe(1)
-    expect(cam.displayIndex).toBeLessThan(1.02)
+    expect(cam.displayIndex).toBe(1)
     detach()
   })
 
-  it('切换在合理时长内完成（0.5–2.5 秒）', () => {
+  it('切换在合理时长内完成（0.4–2.5 秒）', () => {
     const cam = makeEngine()
     const detach = cam.attach()
     pump(16)
@@ -263,11 +274,34 @@ describe('连续力学相机', () => {
     detach()
   })
 
+  it('落位前最后一帧的位移小于 0.1px（不会看到「突然吸过去」）', () => {
+    const cam = makeEngine()
+    const detach = cam.attach()
+    pump(16)
+
+    // 屏幕放大 = P/d ≈ 3.53；1 索引 = 72rem = 1152px 世界坐标；根字号 16px。
+    // 一帧的世界位移换算成屏幕像素：Δindex × 72 × 16 × 3.53
+    const SCALE = (72 * 16 * (120 / 34))
+    const positions: number[] = []
+    const stop = cam.subscribe((f) => positions.push(f.index))
+    cam.step(1)
+    settle(cam)
+    stop()
+
+    // 找到「吸附」那一帧：最后一帧之后位置直接变成整数 1
+    const lastMoving = positions[positions.length - 2] ?? positions[positions.length - 1]
+    const jumpPx = Math.abs(1 - lastMoving) * SCALE
+    expect(jumpPx).toBeLessThan(0.1)
+    detach()
+  })
+
   it('物理参数处于合理区间', () => {
-    // ζ = c / (2√k)，要在 0.6–1.2 之间：太低会振荡多次，太高会显得迟钝
-    const zeta = CAMERA.PHYSICS_DAMPING / (2 * Math.sqrt(CAMERA.PHYSICS_K))
-    expect(zeta).toBeGreaterThan(0.6)
-    expect(zeta).toBeLessThan(1.2)
+    // 近井底势能与锚定力叠加，有效刚度是 2k：
+    //   ζeff = c / (2√(2k))
+    // 必须欠阻尼（有过冲，这是用户要的「冲力」），但不能低到来回振荡。
+    const zetaEff = CAMERA.PHYSICS_DAMPING / (2 * Math.sqrt(2 * CAMERA.PHYSICS_K))
+    expect(zetaEff).toBeGreaterThan(0.45)
+    expect(zetaEff).toBeLessThan(0.75)
   })
 })
 

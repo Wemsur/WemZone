@@ -75,11 +75,12 @@ function onClick(): void {
 
 <style scoped>
 .vendor-demo {
-  /* 世界坐标里的 section 是 absolute + 父级（#world）宽 0，不给宽度会塌成
-     min-content。这里**不能**用 max-width: 90vw —— 百分比/视口单位仍相对
-     0 宽或未定义的包含块计算，会得到 41px 这种荒谬值。
-     46rem 与 Phase 1 占位方块一致，方便直接对照相机行为。 */
-  width: 46rem;
+  /* 尺寸由 .world-section 按视野给（width/height 内联），这里只管填满。
+     早先写死 46rem 并注释「与占位方块一致」—— 那正是区块只占视野 45% 的
+     来源：区块尺寸被内容反向决定，而相机距离 d 根本没有参与。 */
+  width: 100%;
+  height: 100%;
+  overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
