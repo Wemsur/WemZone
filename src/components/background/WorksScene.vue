@@ -1,66 +1,85 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+
+import { buildContours, segmentsToPaths } from '@/engine/contours'
 
 /**
  * 其它作品区背景 —— 用户要求（原文）：
  *
  *   「使用点阵 + 大型轻微起伏的波形均匀分布 + 光晕作为背景」
+ *   后来修正为：「那种等距的静态优美等高线，较细硬边缘」
  *
- * 三层：
- *  1. **波形**：六条横贯全屏的正弦线，均匀分布在画面上，各自以不同速度
- *     横向漂移、幅度很小。路径宽 2000、周期 500，所以位移 -25% 正好无缝循环。
- *  2. **点阵**：左侧是圆点，向右逐渐变成圆角方形（用户在第一轮表格里
- *     写的「圆点→圆角方形的渐变」），用两层点阵 + 横向 mask 交叉实现。
- *  3. **光晕**：一团跟着区块色相的大光晕。
+ * 所以不是流动的正弦波浪，而是**真正的地形等高线**：由几个高斯山包叠出
+ * 高度场，用 marching squares 按等距水平值抽线。线条**静态**、间距均匀、
+ * 细而硬（1px、无模糊、圆头收边）。生成逻辑见 `engine/contours.ts`。
+ *
+ * 点阵与光晕保留。
  */
 defineProps<{ hue: number }>()
-const W = 2000
-const PERIOD = 500
 
-/** 一条正弦波的路径。宽 = 4 个周期，所以 -25% 位移后首尾重合。 */
-function wavePath(amplitude: number, phase: number): string {
-  const pts: string[] = []
-  const step = 10
-  for (let x = 0; x <= W; x += step) {
-    const y = 50 + Math.sin((x / PERIOD) * Math.PI * 2 + phase) * amplitude
-    pts.push(`${x},${y.toFixed(2)}`)
-  }
-  return `M${pts.join(' L')}`
+const root = ref<HTMLDivElement | null>(null)
+const paths = shallowRef<{ level: number; d: string }[]>([])
+const size = ref({ w: 0, h: 0 })
+
+let observer: ResizeObserver | null = null
+let raf = 0
+
+/** 只在尺寸真的变了时重算；等高线是静态的，不需要每帧算 */
+function rebuild(): void {
+  const el = root.value
+  if (!el) return
+  const w = Math.round(el.clientWidth)
+  const h = Math.round(el.clientHeight)
+  if (!w || !h) return
+  if (w === size.value.w && h === size.value.h) return
+  size.value = { w, h }
+  paths.value = segmentsToPaths(buildContours({ width: w, height: h, seed: 11 }))
 }
 
-/** 六条波：幅度 6–18（viewBox 高 100），相位错开，避免平行得像斑马线 */
-const waves = computed(() => {
-  const out: { d: string; top: number; dur: number; reverse: boolean; opacity: number }[] = []
-  for (let i = 0; i < 6; i++) {
-    const amp = 7 + (i % 3) * 5
-    out.push({
-      d: wavePath(amp, i * 0.9),
-      top: 12 + i * 15, // 12% .. 87%，均匀分布
-      dur: 26 + i * 5,
-      reverse: i % 2 === 1,
-      opacity: 0.5 - i * 0.045,
-    })
+function schedule(): void {
+  if (raf !== 0) return
+  raf = requestAnimationFrame(() => {
+    raf = 0
+    rebuild()
+  })
+}
+
+onMounted(() => {
+  rebuild()
+  if (typeof ResizeObserver !== 'undefined') {
+    observer = new ResizeObserver(schedule)
+    if (root.value) observer.observe(root.value)
   }
-  return out
 })
+
+onBeforeUnmount(() => {
+  observer?.disconnect()
+  observer = null
+  if (raf !== 0) cancelAnimationFrame(raf)
+})
+
+/** 线条透明度：越靠内的圈越亮一点，读起来像地形的高处 */
+function opacityOf(level: number, total: number): number {
+  const t = total <= 1 ? 0.5 : level / (total - 1)
+  return 0.12 + t * 0.2
+}
 </script>
 
 <template>
-  <div class="scene" :style="{ '--hue': hue }">
-    <!-- 1. 波形 -->
-    <svg class="waves" :viewBox="`0 0 ${W} 100`" preserveAspectRatio="none" aria-hidden="true">
-      <g
-        v-for="(w, i) in waves"
-        :key="i"
-        class="wave"
-        :style="{
-          '--dur': `${w.dur}s`,
-          '--dir': w.reverse ? 'reverse' : 'normal',
-          '--op': String(w.opacity),
-        }"
-      >
-        <path :d="w.d" />
-      </g>
+  <div ref="root" class="scene" :style="{ '--hue': hue }">
+    <!-- 1. 等高线：静态、等距、细硬边缘 -->
+    <svg
+      class="contours"
+      :viewBox="`0 0 ${size.w || 1} ${size.h || 1}`"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <path
+        v-for="(p, i) in paths"
+        :key="p.level"
+        :d="p.d"
+        :stroke-opacity="opacityOf(i, paths.length)"
+      />
     </svg>
 
     <!-- 2. 点阵：圆点 → 圆角方形 -->
@@ -83,37 +102,23 @@ const waves = computed(() => {
   background: #121316;
 }
 
-/* --- 波形 --- */
-.waves {
+/* --- 等高线 --- */
+.contours {
   position: absolute;
-  inset: -6%;
-  width: 112%;
-  height: 112%;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* 硬边、细线、圆头收边。不加 filter/模糊 —— 用户要的是「较细硬边缘」 */
   overflow: visible;
 }
 
-.wave {
-  transform-box: fill-box;
-  animation: wave-drift var(--dur) linear infinite;
-  animation-direction: var(--dir);
-}
-
-.wave path {
+.contours path {
   fill: none;
-  stroke: hsl(var(--hue) 40% 72% / 1);
-  stroke-width: 0.35;
-  opacity: var(--op);
+  stroke: hsl(var(--hue) 34% 74%);
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
-}
-
-@keyframes wave-drift {
-  from {
-    transform: translateX(0);
-  }
-  /* 一个周期 = 25%（2000 宽的 500），无缝循环 */
-  to {
-    transform: translateX(-25%);
-  }
 }
 
 /* --- 点阵 --- */
@@ -125,13 +130,13 @@ const waves = computed(() => {
 }
 
 .dots-round {
-  background-image: radial-gradient(circle, hsl(var(--hue) 30% 78% / 0.16) 1px, transparent 1.4px);
+  background-image: radial-gradient(circle, hsl(var(--hue) 30% 78% / 0.1) 1px, transparent 1.4px);
   background-size: 18px 18px;
 }
 
 /* 圆角方形：内联 SVG pattern，向右逐渐取代圆点 */
 .dots-square {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Crect x='6.2' y='6.2' width='5.6' height='5.6' rx='1.6' fill='%23ffffff' fill-opacity='0.14'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Crect x='6.2' y='6.2' width='5.6' height='5.6' rx='1.6' fill='%23ffffff' fill-opacity='0.09'/%3E%3C/svg%3E");
   background-size: 18px 18px;
   mask-image:
     radial-gradient(ellipse 82% 78% at 50% 50%, #000 42%, transparent 88%),
@@ -175,7 +180,6 @@ const waves = computed(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wave,
   .glow {
     animation: none;
   }
