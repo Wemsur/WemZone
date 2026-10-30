@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import MobileWorld from '@/components/MobileWorld.vue'
 import HomeSection from '@/components/sections/HomeSection.vue'
 import HomeTopBar from '@/components/sections/HomeTopBar.vue'
+import WorksSection from '@/components/sections/WorksSection.vue'
 import UnifiedCard from '@/components/sections/UnifiedCard.vue'
 import TuningPanel from '@/components/TuningPanel.vue'
 import World from '@/components/World.vue'
@@ -55,6 +56,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   <MobileWorld v-if="narrow">
     <template v-for="section in ACTIVE_SECTIONS" :key="section.id" #[section.id]>
       <HomeSection v-if="section.id === 'home'" />
+      <WorksSection v-else-if="section.id === 'works'" />
       <div v-else class="placeholder">
         <span class="placeholder-index">{{ section.label }}</span>
       </div>
@@ -64,6 +66,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   <World v-else :blur-mode="effectiveBlur">
     <template v-for="section in ACTIVE_SECTIONS" :key="section.id" #[section.id]>
       <HomeSection v-if="section.id === 'home'" />
+      <WorksSection v-else-if="section.id === 'works'" />
       <div v-else class="placeholder">
         <span class="placeholder-index">{{ section.label }}</span>
       </div>
