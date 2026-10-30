@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import MobileWorld from '@/components/MobileWorld.vue'
 import HomeSection from '@/components/sections/HomeSection.vue'
 import HomeTopBar from '@/components/sections/HomeTopBar.vue'
+import UnifiedCard from '@/components/sections/UnifiedCard.vue'
 import TuningPanel from '@/components/TuningPanel.vue'
 import World from '@/components/World.vue'
 import { provideCamera } from '@/composables/useCamera'
@@ -71,6 +72,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
   <!-- 首页顶栏：screen-space，离开首页时上滑淡出 -->
   <HomeTopBar v-if="!narrow" />
+
+  <!-- 统一卡片：全站只有一张，跟随相机在区块锚点间沿曲线移动 -->
+  <UnifiedCard v-if="!narrow" />
 
   <!-- 调试信息（Phase 2 临时，Phase 4/5 移除） -->
   <div v-if="showDebug" class="hud">
