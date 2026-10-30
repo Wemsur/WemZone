@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Wordmark from '@/assets/wemzone-wordmark.svg?component'
+import Hitokoto from '@/components/sections/Hitokoto.vue'
 
 /**
  * 首页内容
@@ -21,6 +22,9 @@ import Wordmark from '@/assets/wemzone-wordmark.svg?component'
       <Wordmark class="wordmark" aria-label="WemZone" role="img" />
     </div>
     <p class="tagline">Wemsur?那是个什么</p>
+
+    <!-- 一言：底部一条，先打字机开场，再每 10s 渐隐渐显 -->
+    <Hitokoto />
   </div>
 </template>
 
