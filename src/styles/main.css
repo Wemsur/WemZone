@@ -259,15 +259,20 @@ body {
      的临界值（只多出 0.2rem），任何取整误差都会露出一条硬边。
      200% → 半高 58.5rem，留 4.5rem 余量。
 
-     渐隐仍然以「两区中点」为中心：中点距本区中心 36rem，所以渐隐区是
-     离中心 18–54rem，也就是离顶边 4.5–40.5rem（占 117rem 的 3.85%–34.6%）。 */
+     顶边渐隐仍然以「两区中点」为中心：中点距本区中心 36rem，所以渐隐区是
+     离中心 18–54rem，也就是离顶边 4.5–40.5rem（占 117rem 的 3.85%–34.6%）。
+
+     **底边也要渐隐**：底边落在下一区已经完全不透明的范围内，所以这段渐隐
+     不会造成「半透明叠半透明」的漏黑；它的作用是让元素自己的硬边消失 ——
+     实际叠放顺序里上一区可能盖在下一区之上，那样底边就会露出来。 */
   mask-image:
     linear-gradient(
       to bottom,
       transparent 0%,
       transparent 3.85%,
       #000 34.62%,
-      #000 100%
+      #000 96.15%,
+      transparent 100%
     ),
     linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
   -webkit-mask-image:
@@ -276,7 +281,8 @@ body {
       transparent 0%,
       transparent 3.85%,
       #000 34.62%,
-      #000 100%
+      #000 96.15%,
+      transparent 100%
     ),
     linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
   mask-composite: intersect;
