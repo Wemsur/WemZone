@@ -212,12 +212,26 @@ body {
    **区块按视野定尺寸**：World.vue 用探针量出「一屏等于多少 rem」，写进每个
    section 的宽高（再留 4% 出血）。距离补偿 `scale(d/P)` 已经在内联 transform
    里，所以屏幕上正好铺满视野。内容要填满这个盒子，而不是把它撑开 —— 否则
-   区块尺寸又会被内容反向决定，回到「屏幕中间一小块」。 */
+   区块尺寸又会被内容反向决定，回到「屏幕中间一小块」。
+
+   ## 这里**不能**是 preserve-3d
+
+   区块里只有两层：`.section-bg`（背景，带 translate 与 mask）和
+   `.section-content`（内容，z-index: 1）。两者都是平的，且**共面**（z 都是 0）。
+
+   只要区块是 preserve-3d，它们就进入 3D 排序：两个深度完全相同的平面在
+   Gecko 里没有稳定顺序，排序结果可以逐帧翻转 —— 内容被排到背景之后，
+   于是「文字与卡片在同一位置整块消失、下一帧又回来」，而背景本身不动。
+   Zen（Gecko 159）上实测就是这个问题；Firefox 132 上恰好没翻。
+
+   区块**内部没有任何东西需要 3D**（背景与内容都是二维层，透视由 #viewport、
+   整体位姿由 #world 提供）。所以这里用默认的 flat：两层按 z-index 正常绘制，
+   顺序确定，不再参与 3D 排序。区块自身仍然被 #world 当作一个平面摆进 3D 世界，
+   透视、倾斜、距离补偿都不受影响。 */
 .world-section {
   position: absolute;
   left: 0;
   top: 0;
-  transform-style: preserve-3d;
   transform-origin: 0 0;
   display: grid;
 }
