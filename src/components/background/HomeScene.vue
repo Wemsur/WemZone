@@ -23,6 +23,7 @@ defineProps<{ hue: number }>()
 <template>
   <div class="scene" :style="{ '--hue': hue, '--home-image': `url(${homeBg})` }">
     <!-- 1. 背景图 + 遮罩。比视口大，边缘在视野外渐隐 -->
+    <div class="photo-bleed" />
     <div class="photo" />
     <div class="photo-mask" />
 
@@ -69,6 +70,26 @@ defineProps<{ hue: number }>()
 /* 遮罩：把图片整体压暗，保证正文可读。
    图片本身很亮（概念艺术），所以除了自上而下的渐变，还在标题位置压一层
    径向暗部 —— 否则白字直接压在花丛上看不清。 */
+/* 底部延伸：把同一张图模糊后向下拉长，填住图片结束后的黑区。
+   图片背景直接淡出会露出页面底色；用一张模糊的、纵向拉伸的自己接上去，
+   下方才是「图片的延续」而不是黑色。 */
+.photo-bleed {
+  position: absolute;
+  left: -12%;
+  right: -12%;
+  top: 44%;
+  bottom: -90%;
+  background-image: var(--home-image, none);
+  background-size: cover;
+  background-position: center top;
+  filter: blur(2.2rem) saturate(0.9) brightness(0.82);
+  transform: scaleY(1.35);
+  transform-origin: top center;
+  mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 0.6) 42%, transparent 92%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 0.6) 42%, transparent 92%);
+  opacity: 0.95;
+}
+
 .photo-mask {
   position: absolute;
   inset: 0;

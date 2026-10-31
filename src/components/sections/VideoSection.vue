@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, type ComponentPublicInstance
 
 import snapshot from '@/data/videos.json'
 import { useCamera, useCameraFrame } from '@/composables/useCamera'
+import { shuffle } from '@/lib/shuffle'
 
 /**
  * 视频区
@@ -45,28 +46,6 @@ const copyEl = ref<HTMLElement | null>(null)
 const rowList = [0, 1, 2, 3]
 
 const latestBvid = computed(() => videos.value[0]?.bvid ?? '')
-
-/**
- * 每行一份**独立打乱**的顺序。
- *
- * 四行如果共用同一份顺序，斜着看会形成同一条重复的斜线，很假。
- * 用确定性洗牌（同一次加载内稳定），行与行之间互补重复。
- */
-function shuffle<T>(input: readonly T[], seed: number): T[] {
-  const a = [...input]
-  let s = seed >>> 0
-  const rnd = (): number => {
-    s = (Math.imul(s, 1664525) + 1013904223) >>> 0
-    return s / 4294967296
-  }
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rnd() * (i + 1))
-    const t = a[i]
-    a[i] = a[j]
-    a[j] = t
-  }
-  return a
-}
 
 const rowData = computed(() => rowList.map((r) => shuffle(videos.value, 1337 + r * 97)))
 

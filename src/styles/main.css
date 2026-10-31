@@ -255,23 +255,24 @@ body {
   height: 200%;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  /* 尺寸从 185% 放到 200%：原来 54.1rem 的半高刚好卡在「覆盖下一区硬边」
-     的临界值（只多出 0.2rem），任何取整误差都会露出一条硬边。
-     200% → 半高 58.5rem，留 4.5rem 余量。
+  /* 尺寸 200%：半高 58.5rem，区块间距 72rem，相邻背景重叠 45rem。
 
-     顶边渐隐仍然以「两区中点」为中心：中点距本区中心 36rem，所以渐隐区是
-     离中心 18–54rem，也就是离顶边 4.5–40.5rem（占 117rem 的 3.85%–34.6%）。
+     **上下两端对称渐隐**，各 36rem：
+     - 顶边渐隐以两区中点为中心（离中心 18–54rem）；
+     - 底边同样渐隐 36rem，于是两块背景在重叠区里**同时半透明、互相透出**，
+       而不是一块硬边压着另一块。
 
-     **底边也要渐隐**：底边落在下一区已经完全不透明的范围内，所以这段渐隐
-     不会造成「半透明叠半透明」的漏黑；它的作用是让元素自己的硬边消失 ——
-     实际叠放顺序里上一区可能盖在下一区之上，那样底边就会露出来。 */
+     对称渐隐的代价是重叠处会漏出一点底色（半透明叠半透明），所以
+     首页/视频区的图片背景额外加了一层「模糊 + 纵向拉伸」的下延层
+     （`.photo-bleed`），让底色下面仍然是图片而不是黑。 */
   mask-image:
     linear-gradient(
       to bottom,
       transparent 0%,
       transparent 3.85%,
       #000 34.62%,
-      #000 96.15%,
+      #000 65.38%,
+      transparent 96.15%,
       transparent 100%
     ),
     linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
@@ -281,7 +282,8 @@ body {
       transparent 0%,
       transparent 3.85%,
       #000 34.62%,
-      #000 96.15%,
+      #000 65.38%,
+      transparent 96.15%,
       transparent 100%
     ),
     linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
@@ -289,31 +291,8 @@ body {
   -webkit-mask-composite: source-in;
 }
 
-/* 最后一个区块没有「下一区」可以盖住它的底边，所以单独在底边渐隐 */
-.section-bg--last {
-  mask-image:
-    linear-gradient(
-      to bottom,
-      transparent 0%,
-      transparent 3.85%,
-      #000 34.62%,
-      #000 65.38%,
-      transparent 96.15%,
-      transparent 100%
-    ),
-    linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
-  -webkit-mask-image:
-    linear-gradient(
-      to bottom,
-      transparent 0%,
-      transparent 3.85%,
-      #000 34.62%,
-      #000 65.38%,
-      transparent 96.15%,
-      transparent 100%
-    ),
-    linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
-}
+/* 首尾区块使用同一套对称渐隐：两端都淡出，世界最上和最下也不会硬切 */
+
 
 /* 内容层：压在背景之上 */
 .section-content {

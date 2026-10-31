@@ -61,6 +61,7 @@ useShaderLayers([
 <template>
   <div class="scene" :style="{ '--hue': hue, '--video-image': `url(${videoBg})` }">
     <!-- 1. 背景图 + 遮罩。比视口大，边缘在视野外渐隐 -->
+    <div class="photo-bleed" />
     <div class="photo" />
     <div class="photo-mask" />
 
@@ -97,6 +98,24 @@ useShaderLayers([
   mask-image: radial-gradient(ellipse 88% 88% at 50% 50%, #000 55%, transparent 100%);
   -webkit-mask-image: radial-gradient(ellipse 88% 88% at 50% 50%, #000 55%, transparent 100%);
   transform: translate3d(var(--bg-px), var(--bg-py), 0) scale(1.04);
+}
+
+/* 底部延伸：同一张图模糊后向下拉长，避免图片结束后直接变黑 */
+.photo-bleed {
+  position: absolute;
+  left: -12%;
+  right: -12%;
+  top: 44%;
+  bottom: -90%;
+  background-image: var(--video-image, none);
+  background-size: cover;
+  background-position: center top;
+  filter: blur(2.2rem) saturate(0.9) brightness(0.82);
+  transform: scaleY(1.35);
+  transform-origin: top center;
+  mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 0.6) 42%, transparent 92%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 0.6) 42%, transparent 92%);
+  opacity: 0.95;
 }
 
 .photo-mask {

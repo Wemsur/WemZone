@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref, type ComponentPublicInstance } from 'v
 
 import { useCamera, useCameraFrame } from '@/composables/useCamera'
 import { PROJECTS } from '@/data/projects'
+import { shuffle } from '@/lib/shuffle'
 
 /**
  * 其它作品 —— 弹幕式项目列表
@@ -37,6 +38,9 @@ const copyA = ref<HTMLElement | null>(null)
 const copyB = ref<HTMLElement | null>(null)
 
 const copies = Array.from({ length: COPY_COUNT }, (_, i) => i)
+
+/** 两行各自独立打乱，避免两行出现同一条重复的斜线 */
+const rowProjects = [shuffle(PROJECTS, 211), shuffle(PROJECTS, 577)]
 
 /** 只在第一份上挂测量用的 ref（另外两份宽度相同） */
 function setCopyA(el: Element | ComponentPublicInstance | null): void {
@@ -156,7 +160,7 @@ onBeforeUnmount(() => {
         <div ref="rowA" class="track">
           <div v-for="c in copies" :key="c" :ref="c === 0 ? setCopyA : undefined" class="copy">
             <a
-              v-for="p in PROJECTS"
+              v-for="p in rowProjects[0]"
               :key="`${c}-${p.name}`"
               class="project"
               :href="p.href"
@@ -180,7 +184,7 @@ onBeforeUnmount(() => {
         <div ref="rowB" class="track">
           <div v-for="c in copies" :key="c" :ref="c === 0 ? setCopyB : undefined" class="copy">
             <a
-              v-for="p in PROJECTS"
+              v-for="p in rowProjects[1]"
               :key="`${c}-${p.name}`"
               class="project"
               :href="p.href"
