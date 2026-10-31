@@ -212,7 +212,7 @@ onBeforeUnmount(() => {
          这是给访客的手感设置，不是开发调试项 —— 不同设备的滚动粒度差一个
          数量级，同一套阈值不可能对所有人都合适。 -->
     <div class="sensitivity">
-      <div class="sens-panel">
+      <div class="sens-panel" @wheel.stop>
         <label class="sens-head" for="wz-sensitivity">
           <span class="sens-title">滑动灵敏度</span>
           <span class="sens-value">{{ sensitivityLabel }}×</span>
