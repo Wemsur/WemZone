@@ -195,9 +195,12 @@ function playText(n: number): string {
       </p>
     </header>
 
-    <!-- 卡片在视野边缘渐隐，而不是被区域边界硬切 -->
+    <!-- 两层遮罩嵌套（alpha 自然相乘，不依赖 mask-composite）：
+         ① .stage-mask  整体在视野边缘渐隐；
+         ② .corner-mask 只在左上角让卡片变半透明。 -->
     <div class="stage-mask">
-      <div ref="grid" class="grid">
+      <div class="corner-mask">
+        <div ref="grid" class="grid">
       <div
         v-for="r in rowList"
         :key="r"
@@ -240,7 +243,7 @@ function playText(n: number): string {
           </div>
         </div>
       </div>
-
+        </div>
       </div>
     </div>
   </div>
@@ -305,8 +308,16 @@ function playText(n: number): string {
 .stage-mask {
   position: absolute;
   inset: 0;
-  /* 只在**左上角**让卡片变半透明（给标题让出可读区）。
-     右下角不应该渐隐 —— 之前加的径向边缘 mask 把四边都淡掉了。 */
+  /* ① 整体在视野边缘渐隐：半径必须落在视口内，否则透明区跑到视口外，
+     视口边缘仍接近不透明，看起来就是硬切。 */
+  mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 55%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 55%, transparent 100%);
+}
+
+/* ② 只在左上角让卡片变半透明（给标题让出可读区） */
+.corner-mask {
+  position: absolute;
+  inset: 0;
   mask-image: linear-gradient(to bottom right, rgb(0 0 0 / 0.5) 0%, #000 52%);
   -webkit-mask-image: linear-gradient(to bottom right, rgb(0 0 0 / 0.5) 0%, #000 52%);
 }

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 import launcherShot from '@/assets/bg/launcher-placeholder.png'
-import { useCameraFrame } from '@/composables/useCamera'
+import { useCamera, useCameraFrame } from '@/composables/useCamera'
 
 /**
  * Celestial Launcher 区
@@ -12,35 +12,88 @@ import { useCameraFrame } from '@/composables/useCamera'
  *     下落并左移，后续再替换为分层 + 真实启动器小窗」
  *
  * 所以现在只有：一张真实的启动器截图，进入本区时**从上方下落并左移**到
- * 左侧，右侧出现标题、简短介绍与进入官网的按钮。后续会用分层动画替换掉
- * 这张静图（真实启动器窗口复刻属于 Phase 6）。
+ * 左侧，右侧的标题/介绍/按钮随后浮上来。后续会用分层动画替换掉这张静图
+ * （真实启动器窗口复刻属于 Phase 6）。
  *
- * 动画由相机连续索引驱动（0.9 → 1.5 之间完成），与站内其它运动同源。
+ * ## 为什么用「时间轴」而不是「相机索引」
+ *
+ * 之前把进度绑在连续索引上（0.5 → 0.97），结果动画在相机还没到时就已经
+ * 播完了 —— 人看到的时候图片已经躺在左边，等于没做动画。
+ * 现在改为**到达时触发**：索引进入 [0.90, 1.18] 才启动一条 1.15s 的时间轴，
+ * 自己排 rAF，所以相机停帧后动画照样播完。
  */
-
+const camera = useCamera()
 const panel = ref<HTMLElement | null>(null)
+const copy = ref<HTMLElement | null>(null)
+
+const DURATION = 1150
+let raf = 0
+let startedAt = 0
+/** 上一帧是否已经在「本区」范围内，用来识别「刚进入」 */
+let near = false
+
+const reduced =
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v
 }
 
-function smoothstep(a: number, b: number, x: number): number {
-  const t = clamp((x - a) / (b - a), 0, 1)
-  return t * t * (3 - 2 * t)
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3)
+}
+
+/** t=0：在右上、更远、更小、透明；t=1：落在左侧原位 */
+function apply(t: number): void {
+  if (panel.value) {
+    panel.value.style.opacity = t.toFixed(3)
+    panel.value.style.transform =
+      `translate3d(${((1 - t) * 26).toFixed(2)}%, ${((1 - t) * -68).toFixed(2)}%, 0) ` +
+      `scale(${(0.9 + t * 0.1).toFixed(4)}) ` +
+      `rotate(${((1 - t) * 3).toFixed(2)}deg)`
+  }
+  if (copy.value) {
+    // 文字比图片晚一点浮上来
+    const ct = clamp((t - 0.22) / 0.78, 0, 1)
+    copy.value.style.opacity = ct.toFixed(3)
+    copy.value.style.transform = `translate3d(0, ${((1 - ct) * 1.6).toFixed(2)}rem, 0)`
+  }
+}
+
+function play(): void {
+  if (reduced) {
+    apply(1)
+    return
+  }
+  if (raf !== 0) cancelAnimationFrame(raf)
+  startedAt = performance.now()
+  apply(0)
+  const tick = (now: number): void => {
+    raf = 0
+    const p = Math.min(1, (now - startedAt) / DURATION)
+    apply(easeOutCubic(p))
+    if (p < 1) raf = requestAnimationFrame(tick)
+  }
+  raf = requestAnimationFrame(tick)
 }
 
 useCameraFrame((frame) => {
-  const el = panel.value
-  if (!el) return
-  // 必须在索引到 1 之前就落位：之前写成 0.9 → 1.5，静止在 1 时 t 只有 0.07，
-  // 截图几乎完全透明 —— 看起来就是「动画没做」。
-  // 现在从半程开始，到 0.97 就完全到位。
-  const t = smoothstep(0.5, 0.97, frame.index)
-  // t=0：在右上、更远、更小；t=1：落到左侧原位
-  el.style.opacity = t.toFixed(3)
-  el.style.transform =
-    `translate3d(${((1 - t) * 16).toFixed(2)}%, ${((1 - t) * -52).toFixed(2)}%, 0) ` +
-    `scale(${(0.92 + t * 0.08).toFixed(4)}) rotate(${((1 - t) * 2.2).toFixed(2)}deg)`
+  const isNear = frame.index > 0.9 && frame.index < 1.18
+  if (isNear && !near) play()
+  near = isNear
+})
+
+onMounted(() => {
+  const i = camera.engine.displayIndex
+  if (i > 0.9 && i < 1.18) play()
+  else apply(0)
+})
+
+onBeforeUnmount(() => {
+  if (raf !== 0) cancelAnimationFrame(raf)
+  raf = 0
 })
 </script>
 
@@ -50,7 +103,7 @@ useCameraFrame((frame) => {
       <img class="shot" :src="launcherShot" alt="Celestial Launcher 截图" draggable="false" />
     </div>
 
-    <div class="copy">
+    <div ref="copy" class="copy">
       <h2 class="title">Celestial Launcher</h2>
       <p class="lead">
         一个基于 Modrinth 的 Minecraft 启动器。分屏浏览、逐句翻译、主题与背景都可以改。
@@ -101,6 +154,8 @@ useCameraFrame((frame) => {
 .copy {
   flex: 0 0 34%;
   max-width: 34rem;
+  opacity: 0;
+  will-change: transform, opacity;
 }
 
 .title {
