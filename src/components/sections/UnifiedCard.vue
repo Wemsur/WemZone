@@ -1,8 +1,13 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import Wordmark from '@/assets/wemzone-wordmark.svg?component'
 import { useCamera, useCameraFrame } from '@/composables/useCamera'
+import {
+  SENSITIVITY_MAX,
+  SENSITIVITY_MIN,
+  scrollSensitivity,
+} from '@/lib/preferences'
 import { ACTIVE_SECTIONS } from '@/sections'
 
 /**
@@ -107,7 +112,12 @@ useCameraFrame((frame) => {
   // 相对较弱的动态模糊：内容层最多 6px，这里封顶 2px
   const blur = clamp(Math.abs(frame.velocity) * 0.9, 0, 2)
   el.style.filter = blur > 0.15 ? `blur(${blur.toFixed(2)}px)` : ''
+
+  // 卡片跑到下半屏时，灵敏度面板翻到卡片**上方** —— 否则会顶出视口底边
+  el.classList.toggle('flip', p.y > window.innerHeight * 0.5)
 })
+
+const sensitivityLabel = computed(() => String(Math.round(scrollSensitivity.value * 100) / 100))
 
 onMounted(() => {
   measure()
@@ -195,6 +205,29 @@ onBeforeUnmount(() => {
             />
           </svg>
         </a>
+      </div>
+    </div>
+
+    <!-- 滑动灵敏度：悬停整张卡片时从卡片下方（下半屏时从上方）滑出。
+         这是给访客的手感设置，不是开发调试项 —— 不同设备的滚动粒度差一个
+         数量级，同一套阈值不可能对所有人都合适。 -->
+    <div class="sensitivity">
+      <div class="sens-panel">
+        <label class="sens-head" for="wz-sensitivity">
+          <span class="sens-title">滑动灵敏度</span>
+          <span class="sens-value">{{ sensitivityLabel }}×</span>
+        </label>
+        <input
+          id="wz-sensitivity"
+          v-model.number="scrollSensitivity"
+          class="sens-range"
+          type="range"
+          :min="SENSITIVITY_MIN"
+          :max="SENSITIVITY_MAX"
+          step="0.05"
+          aria-label="滑动灵敏度"
+        />
+        <p class="sens-hint">滑得很费力就调大，一碰就翻页就调小</p>
       </div>
     </div>
   </aside>
@@ -305,5 +338,130 @@ onBeforeUnmount(() => {
 .icon svg {
   width: 1.1rem;
   height: 1.1rem;
+}
+
+/* --- 滑动灵敏度 ---
+   悬停整张卡片时滑出。面板是卡片的绝对定位子元素，所以跟着卡片一起移动；
+   `top: 100%` + padding 而不是 margin，是为了让「卡片 → 面板」之间的空隙
+   也算在悬停区域内 —— 否则鼠标穿过空隙时面板会立刻收起，够不着滑块。 */
+.sensitivity {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  width: 13.5rem;
+  padding-top: 0.45rem;
+  opacity: 0;
+  transform: translateY(-0.3rem);
+  pointer-events: none;
+  transition:
+    opacity 180ms ease,
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 卡片在下半屏时面板翻到上方，避免顶出视口底边 */
+.card.flip .sensitivity {
+  top: auto;
+  bottom: 100%;
+  padding-top: 0;
+  padding-bottom: 0.45rem;
+  transform: translateY(0.3rem);
+}
+
+.card:hover .sensitivity,
+.card:focus-within .sensitivity {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.sens-panel {
+  padding: 0.6rem 0.7rem 0.55rem;
+  border: 1px solid rgb(255 255 255 / 0.07);
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, #101010 55%, transparent);
+  backdrop-filter: blur(0.9rem) saturate(1.1);
+  box-shadow: 0 0.6rem 2rem rgb(0 0 0 / 0.32);
+}
+
+.sens-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sens-title {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--wz-text-tertiary);
+}
+
+.sens-value {
+  font-family: ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--wz-brand-soft);
+}
+
+.sens-range {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  width: 100%;
+  height: 0.95rem;
+  margin: 0.1rem 0 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.sens-range::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 1px;
+  background: rgb(255 255 255 / 0.18);
+}
+
+.sens-range::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 0.62rem;
+  height: 0.62rem;
+  margin-top: -0.26rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--wz-brand-soft);
+  box-shadow: 0 0 0 0.18rem hsl(var(--wz-brand-hue) 72% 75% / 0.18);
+  transition: box-shadow 160ms ease;
+}
+
+.sens-range::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 0.3rem hsl(var(--wz-brand-hue) 72% 75% / 0.26);
+}
+
+.sens-range::-moz-range-track {
+  height: 2px;
+  border-radius: 1px;
+  background: rgb(255 255 255 / 0.18);
+}
+
+.sens-range::-moz-range-thumb {
+  width: 0.62rem;
+  height: 0.62rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--wz-brand-soft);
+}
+
+.sens-range:focus-visible {
+  outline: 1px solid var(--wz-brand-soft);
+  outline-offset: 0.2rem;
+  border-radius: 0.3rem;
+}
+
+.sens-hint {
+  margin: 0.3rem 0 0;
+  font-size: 0.62rem;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  color: var(--wz-text-tertiary);
+  opacity: 0.72;
 }
 </style>

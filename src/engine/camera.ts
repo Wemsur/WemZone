@@ -44,6 +44,8 @@ export interface CameraConfig {
   stops: readonly Stop[]
   /** 透视距离（rem）。必须与 CSS 里的 --perspective 一致。 */
   perspective: number
+  /** 用户可调的滑动灵敏度倍率（1 = 默认），见 input.ts 的 InputOptions。 */
+  getSensitivity?: () => number
 }
 
 export interface Engine {
@@ -126,6 +128,7 @@ export function createCamera(cfg: CameraConfig): Engine {
   const input: InputSource = createInput({
     getIndex: () => phys.s,
     last,
+    getSensitivity: cfg.getSensitivity,
   })
 
   function emitFrame(): void {

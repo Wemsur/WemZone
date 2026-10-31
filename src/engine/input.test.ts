@@ -33,9 +33,9 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function setup(getIndex = () => 0) {
+function setup(getIndex = () => 0, getSensitivity?: () => number) {
   const intents: Intent[] = []
-  const input = createInput({ getIndex, last: 4 })
+  const input = createInput({ getIndex, last: 4, getSensitivity })
   input.attach()
   input.onIntent((i) => intents.push(i))
   return { intents, input }
@@ -146,5 +146,36 @@ describe('输入手势分类', () => {
     expect(CAMERA.STEP_THRESHOLD_PX).toBeLessThan(1200)
     // 速度分支的累计下限不能太小，否则轻滑就翻页
     expect(CAMERA.STEP_SPEED_MIN_PX).toBeGreaterThan(100)
+  })
+
+  /* ---- 用户灵敏度 ---- */
+
+  it('灵敏度放大时，同样的滚动更早翻页', () => {
+    // 4 格慢滚 = 500px × 2.5 = 1000px，越过 750 阈值
+    const { intents } = setup(() => 2, () => 2.5)
+    for (let i = 0; i < 4; i++) wheel(100, 40)
+    expect(intents.filter((i) => i.kind === 'step')).toHaveLength(1)
+  })
+
+  it('灵敏度调低时，同样的滚动不足以翻页', () => {
+    // 12 格慢滚 = 1200px × 0.4 = 480px，仍在阈值下
+    const { intents } = setup(() => 2, () => 0.4)
+    for (let i = 0; i < 12; i++) wheel(100, 40)
+    expect(intents.filter((i) => i.kind === 'step')).toHaveLength(0)
+  })
+
+  it('灵敏度也缩放果冻的力度（pull 的 delta）', () => {
+    const { intents } = setup(() => 2, () => 2)
+    wheel(50, 40)
+    const pull = intents.find((i) => i.kind === 'pull')
+    expect(pull).toMatchObject({ kind: 'pull', delta: 100 })
+  })
+
+  it('灵敏度不改变「滚轮大事件」的粒度判定', () => {
+    // 滚轮一格 100px，即使灵敏度调到 2.5（150px）也不该走速度分支
+    const { intents } = setup(() => 2, () => 2.5)
+    wheel(100, 16)
+    wheel(100, 16)
+    expect(intents.filter((i) => i.kind === 'step')).toHaveLength(0)
   })
 })

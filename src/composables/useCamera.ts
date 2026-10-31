@@ -31,6 +31,7 @@ import {
 import { createCamera, buildStops, type CameraFrame, type Engine } from '@/engine'
 import { CAMERA } from '@/engine/constants'
 import { renderPose } from '@/engine/world'
+import { scrollSensitivity } from '@/lib/preferences'
 
 export interface CameraApi {
   /** 最近的整数区块号。仅在整数变化时更新。 */
@@ -60,6 +61,8 @@ export function provideCamera(): CameraApi {
   const engine = createCamera({
     stops: buildStops(),
     perspective: CAMERA.PERSPECTIVE,
+    // 灵敏度是「用户偏好」，不是引擎常量：每读一次输入现读，改了立刻生效
+    getSensitivity: () => scrollSensitivity.value,
   })
 
   const current = ref(0)

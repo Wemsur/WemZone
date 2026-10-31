@@ -43,6 +43,18 @@ export interface InputOptions {
   getIndex: () => number
   /** 最后一个合法索引 */
   last: number
+  /**
+   * 用户可调的滑动灵敏度倍率（1 = 默认）。
+   *
+   * 它缩放的是**位移**而不是阈值本身：把手势里的每个 delta 乘上倍率，
+   * 累计量与速度判定就一起变了，等价于 `STEP_THRESHOLD_PX / 倍率`。
+   * 这样「越容易翻页」和「同样力度推得更远」是同一件事，不会出现
+   * 「阈值降了但果冻还是没反应」的割裂。
+   *
+   * 唯一**不**跟着缩放的是 `TRACKPAD_MAX_EVENT_PX` 的粒度判定 ——
+   * 它区分的是「滚轮的大事件」与「触控板的小事件」，是设备属性，不是手感。
+   */
+  getSensitivity?: () => number
 }
 
 /** 把 wheel 事件的 delta 归一化成像素。 */
@@ -87,7 +99,10 @@ export function createInput(opts: InputOptions): InputSource {
     if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
 
     const now = performance.now()
-    const delta = normalizeWheel(e)
+    const raw = normalizeWheel(e)
+    // 用户灵敏度只缩放位移；粒度判定（下面 trackpadLike）仍用原始 delta
+    const sensitivity = opts.getSensitivity?.() ?? 1
+    const delta = raw * sensitivity
 
     // 手势切分：静默够久就是新手势
     if (now - lastT > CAMERA.GESTURE_GAP_MS) {
@@ -121,7 +136,7 @@ export function createInput(opts: InputOptions): InputSource {
     // 滚轮一格是个大事件（约 100px），按事件间隔算出来的「速度」反而很高，
     // 若不排除它，两格滚轮就会被误判成猛滑，750px 的阈值形同虚设。
     // 真正的区别是粒度而不是速度：触控板产生许多小事件，滚轮产生少数大事件。
-    const trackpadLike = Math.abs(delta) <= CAMERA.TRACKPAD_MAX_EVENT_PX
+    const trackpadLike = Math.abs(raw) <= CAMERA.TRACKPAD_MAX_EVENT_PX
     const fastFlick =
       trackpadLike &&
       v >= CAMERA.STEP_SPEED_PX_MS &&
