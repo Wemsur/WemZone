@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref, type ComponentPublicInstance
 import snapshot from '@/data/videos.json'
 import { useCamera, useCameraFrame } from '@/composables/useCamera'
 import { shuffle } from '@/lib/shuffle'
+import { narrow } from '@/lib/viewport'
 
 /**
  * 视频区
@@ -86,16 +87,17 @@ function frame(now: number): void {
   last = now
 
   const index = camera.engine.displayIndex
-  if (!inRange(index)) {
+  const mobile = narrow.value
+  if (!mobile && !inRange(index)) {
     last = 0
     return
   }
 
-  // 整个网格的入场：相机靠近时从略偏右下浮上来
-  const enter = smoothstep(2.45, 3.05, index)
+  // 整个网格的入场：相机靠近时从略偏右下浮上来（窄版没有相机，常驻全亮）
+  const enter = mobile ? 1 : smoothstep(2.45, 3.05, index)
   if (grid.value) {
     grid.value.style.opacity = (0.25 + enter * 0.75).toFixed(3)
-    grid.value.style.transform = `translate(-50%, -50%) rotate(30deg) scale(${(1.02 + (1 - enter) * 0.05).toFixed(4)})`
+    grid.value.style.transform = `translate(-50%, -50%) rotate(var(--grid-angle, 30deg)) scale(${(1.02 + (1 - enter) * 0.05).toFixed(4)})`
   }
 
   const k = 1 - Math.exp(-dt / DECEL_TAU)
@@ -116,13 +118,24 @@ function frame(now: number): void {
 
 function sync(index: number): void {
   if (reduced) return
-  if (inRange(index) && raf === 0) {
+  const shouldRun = narrow.value || inRange(index)
+  if (shouldRun && raf === 0) {
     last = 0
     raf = requestAnimationFrame(frame)
   }
 }
 
 useCameraFrame((f) => sync(f.index))
+
+const root = ref<HTMLElement | null>(null)
+/** 窄版没有相机帧，用可见性开关循环，避免离屏还每帧跑 */
+let io: IntersectionObserver | null = null
+
+function stopLoop(): void {
+  if (raf !== 0) cancelAnimationFrame(raf)
+  raf = 0
+  last = 0
+}
 
 function setRow(i: number, el: Element | null): void {
   rows.value[i] = (el as HTMLElement) ?? null
@@ -149,13 +162,26 @@ async function loadLive(): Promise<void> {
 
 onMounted(() => {
   measure()
-  sync(camera.engine.displayIndex)
+  window.addEventListener('resize', measure, { passive: true })
   void loadLive()
+  if (narrow.value && typeof IntersectionObserver !== 'undefined' && root.value) {
+    io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) sync(camera.engine.displayIndex)
+        else stopLoop()
+      }
+    })
+    io.observe(root.value)
+  } else {
+    sync(camera.engine.displayIndex)
+  }
 })
 
 onBeforeUnmount(() => {
-  if (raf !== 0) cancelAnimationFrame(raf)
-  raf = 0
+  window.removeEventListener('resize', measure)
+  io?.disconnect()
+  io = null
+  stopLoop()
 })
 
 /** 播放量：万以上用「x.x 万」，与原站习惯一致 */
@@ -166,7 +192,7 @@ function playText(n: number): string {
 </script>
 
 <template>
-  <div class="video">
+  <div ref="root" class="video">
     <header class="head">
       <h2 class="title">视频创作者</h2>
       <p class="lead">
@@ -398,6 +424,60 @@ function playText(n: number): string {
   color: #17130f;
   font-size: 0.62rem;
   letter-spacing: 0.08em;
+}
+
+@media (max-width: 900px) and (orientation: portrait) {
+  /* 竖屏：倾斜角减到 18°，30° 在窄屏上会把一行切成碎三角，
+     标题也没地方落。卡片缩到 15rem，一行能露出两张多。 */
+  .grid {
+    --grid-angle: 18deg;
+    width: 220%;
+    height: 220%;
+    gap: 0.9rem;
+  }
+  .track,
+  .copy {
+    gap: 0.8rem;
+  }
+  .vcard {
+    width: 15rem;
+    height: 8.44rem;
+  }
+  .head {
+    left: 1.25rem;
+    top: 1.9rem;
+    width: min(19rem, 84%);
+  }
+  /* 竖屏里文字正压在斜向卡片上（宽版靠左上的 corner-mask 让出一块空地，
+     但窄屏卡片更大、更密）。给标题垫一层从顶部压下来的暗色柔光，
+     保证可读，同时不留可见的矩形边。 */
+  .head::before {
+    content: '';
+    position: absolute;
+    inset: -5rem -5.5rem -4.5rem -5.5rem;
+    z-index: -1;
+    /* 椭圆柔光：四边都是渐隐的，不会在亮背景上露出一块矩形暗板 */
+    background: radial-gradient(
+      ellipse 62% 58% at 46% 44%,
+      rgb(7 8 10 / 0.88) 0%,
+      rgb(7 8 10 / 0.62) 46%,
+      transparent 78%
+    );
+  }
+  .title {
+    font-size: 2rem;
+  }
+  .lead {
+    margin-top: 0.4rem;
+    font-size: 0.86rem;
+    line-height: 1.65;
+  }
+  .vtitle {
+    font-size: 0.82rem;
+  }
+  .stat {
+    font-size: 0.64rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

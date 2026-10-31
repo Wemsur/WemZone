@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 import launcherShot from '@/assets/bg/launcher-placeholder.png'
 import { useCamera, useCameraFrame } from '@/composables/useCamera'
+import { narrow } from '@/lib/viewport'
 
 /**
  * Celestial Launcher 区
@@ -23,6 +24,7 @@ import { useCamera, useCameraFrame } from '@/composables/useCamera'
  * 自己排 rAF，所以相机停帧后动画照样播完。
  */
 const camera = useCamera()
+const root = ref<HTMLElement | null>(null)
 const panel = ref<HTMLElement | null>(null)
 const copy = ref<HTMLElement | null>(null)
 
@@ -31,6 +33,8 @@ let raf = 0
 let startedAt = 0
 /** 上一帧是否已经在「本区」范围内，用来识别「刚进入」 */
 let near = false
+/** 窄版：没有相机帧，用 IntersectionObserver 触发同一条时间轴 */
+let io: IntersectionObserver | null = null
 
 const reduced =
   typeof window !== 'undefined' &&
@@ -80,12 +84,32 @@ function play(): void {
 }
 
 useCameraFrame((frame) => {
+  if (narrow.value) return
   const isNear = frame.index > 0.9 && frame.index < 1.18
   if (isNear && !near) play()
   near = isNear
 })
 
 onMounted(() => {
+  // 窄版是原生滚动，相机索引永远是 0 —— 不能靠它触发入场。
+  // 改用 IntersectionObserver 观察本节：滚进来就播，滚出去再回来会重播。
+  if (narrow.value) {
+    apply(0)
+    const el = root.value
+    if (typeof IntersectionObserver !== 'undefined' && el) {
+      io = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) if (e.isIntersecting && e.intersectionRatio > 0.5) play()
+        },
+        { threshold: [0.55] },
+      )
+      io.observe(el)
+    } else {
+      apply(1)
+    }
+    return
+  }
+
   const i = camera.engine.displayIndex
   if (i > 0.9 && i < 1.18) play()
   else apply(0)
@@ -94,11 +118,13 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (raf !== 0) cancelAnimationFrame(raf)
   raf = 0
+  io?.disconnect()
+  io = null
 })
 </script>
 
 <template>
-  <div class="launcher">
+  <div ref="root" class="launcher">
     <div ref="panel" class="shot-wrap">
       <img class="shot" :src="launcherShot" alt="Celestial Launcher 截图" draggable="false" />
     </div>
@@ -224,8 +250,8 @@ onBeforeUnmount(() => {
 @media (max-width: 900px) and (orientation: portrait) {
   .launcher {
     flex-direction: column;
-    gap: 2rem;
-    padding: 3rem 1.5rem;
+    gap: 1.6rem;
+    padding: 2.6rem 1.35rem;
     text-align: center;
   }
   .shot-wrap {
@@ -233,9 +259,24 @@ onBeforeUnmount(() => {
     width: 100%;
     justify-content: center;
   }
+  .shot {
+    max-height: 44vh;
+  }
   .copy {
     flex: 0 0 auto;
     width: 100%;
+    max-width: none;
+  }
+  .title {
+    font-size: 2.1rem;
+  }
+  .lead {
+    font-size: 0.95rem;
+    line-height: 1.7;
+  }
+  .cta {
+    margin-top: 1.2rem;
+    font-size: 0.95rem;
   }
 }
 </style>

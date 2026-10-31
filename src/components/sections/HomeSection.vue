@@ -80,11 +80,24 @@ import Hitokoto from '@/components/sections/Hitokoto.vue'
 }
 
 @media (max-width: 900px) and (orientation: portrait) {
+  /* 竖屏宽度只有 24rem 上下：标识必须**一行放得下**。
+     宽版是「庭域 7rem + WemZone 2.7rem」，等比缩到竖屏会超过一屏宽，
+     浏览器于是把「庭域」折成两行（CJK 可以在任意字之间断行）。 */
+  .lockup {
+    flex-wrap: nowrap;
+    gap: 0.55rem;
+  }
   .tingyu {
-    font-size: 5rem;
+    font-size: 4.4rem;
+    white-space: nowrap;
+    flex: 0 0 auto;
   }
   .wordmark {
-    height: 2rem;
+    flex: 0 0 auto;
+    height: 1.7rem;
+  }
+  .tagline {
+    font-size: 1.02rem;
   }
 }
 </style>

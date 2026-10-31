@@ -130,4 +130,28 @@ const LINKS = [
 .link:hover::after {
   opacity: 1;
 }
+
+@media (max-width: 900px) and (orientation: portrait) {
+  .contact {
+    gap: 1rem;
+    padding: 2rem 1.35rem;
+  }
+  .statement {
+    font-size: 1.72rem;
+    line-height: 1.45;
+    text-wrap: balance;
+  }
+  .links {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    margin-top: 0.9rem;
+  }
+  .label {
+    font-size: 1.05rem;
+  }
+  .hint {
+    font-size: 0.72rem;
+  }
+}
 </style>

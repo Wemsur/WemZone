@@ -24,6 +24,8 @@ import { ACTIVE_SECTIONS } from '@/sections'
 const root = ref<HTMLElement | null>(null)
 /** 每节相对视口的进度（-1 = 还没进，0 = 正好居中，1 = 已离开） */
 const offsets = ref<number[]>(ACTIVE_SECTIONS.map(() => 0))
+/** 当前正中的那一节（驱动右侧导航的高亮） */
+const active = ref(0)
 
 let raf = 0
 let cleanup: (() => void) | null = null
@@ -40,13 +42,23 @@ function measure(): void {
   if (!el) return
   const vh = window.innerHeight
   const next: number[] = []
-  for (const sec of Array.from(el.querySelectorAll<HTMLElement>('[data-mobile-section]'))) {
+  let best = 0
+  let bestDist = Infinity
+  for (const [i, sec] of Array.from(
+    el.querySelectorAll<HTMLElement>('[data-mobile-section]'),
+  ).entries()) {
     const r = sec.getBoundingClientRect()
     const center = r.top + r.height / 2
     // -1 .. 1，0 表示正好在视口中心
-    next.push(Math.max(-1, Math.min(1, (center - vh / 2) / vh)))
+    const d = Math.max(-1, Math.min(1, (center - vh / 2) / vh))
+    next.push(d)
+    if (Math.abs(d) < bestDist) {
+      bestDist = Math.abs(d)
+      best = i
+    }
   }
   offsets.value = next
+  if (active.value !== best) active.value = best
 }
 
 function schedule(): void {
@@ -73,6 +85,14 @@ onBeforeUnmount(() => {
   cleanup?.()
   cleanup = null
 })
+
+/** 跳转到某一节（右侧圆点导航） */
+function go(i: number): void {
+  const el = root.value
+  if (!el) return
+  const sec = el.querySelectorAll<HTMLElement>('[data-mobile-section]')[i]
+  sec?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 
 /** 内容自身的轻微位移 + 缩放：越靠近视口中心越「正」。 */
 function sectionStyle(i: number): Record<string, string> {
@@ -107,6 +127,21 @@ function sectionStyle(i: number): Record<string, string> {
         <slot :name="section.id" :index="i" />
       </div>
     </section>
+
+    <!-- 右侧区块导航：窄版是原生滚动，宽版那张「统一卡片」不出现，
+         所以给它一条等价的进度条 —— 高亮当前区，点一下滚过去。 -->
+    <nav class="mobile-nav" aria-label="区块导航">
+      <button
+        v-for="(section, i) in ACTIVE_SECTIONS"
+        :key="section.id"
+        class="nav-bar"
+        :class="{ current: active === i }"
+        type="button"
+        :aria-label="section.label"
+        :aria-current="active === i ? 'true' : undefined"
+        @click="go(i)"
+      />
+    </nav>
   </div>
 </template>
 
@@ -122,6 +157,12 @@ function sectionStyle(i: number): Record<string, string> {
   scroll-snap-type: y mandatory;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
+  /* 触屏上滚动条是多余的装饰（且会压住右侧导航） */
+  scrollbar-width: none;
+}
+
+.mobile-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .mobile-section {
@@ -139,6 +180,10 @@ function sectionStyle(i: number): Record<string, string> {
 
 .mobile-inner {
   width: 100%;
+  /* 必须撑满一节：各区的内容组件都是 `height: 100%` 的（宽版里由
+     .section-content 给这个高度）。这里若只按内容高度收缩，
+     视频区会直接塌成 0 高，首页的一言也会压在标题上。 */
+  height: 100%;
   display: grid;
   place-items: center;
   /* 轻微弹簧感的过渡（宽版禁用一切 transition，窄版则靠它做柔和跟随） */
@@ -149,5 +194,45 @@ function sectionStyle(i: number): Record<string, string> {
   .mobile-inner {
     transition: none;
   }
+}
+
+/* 右侧区块导航。fixed 相对视口，不随容器滚动。 */
+.mobile-nav {
+  position: fixed;
+  right: 0.35rem;
+  top: 50%;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  transform: translateY(-50%);
+}
+
+.nav-bar {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.nav-bar::before {
+  content: '';
+  width: 2px;
+  height: 0.72rem;
+  border-radius: 1px;
+  background: rgb(255 255 255 / 0.26);
+  transition:
+    height 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 220ms ease;
+}
+
+.nav-bar.current::before {
+  height: 1.15rem;
+  background: var(--wz-brand-soft);
 }
 </style>

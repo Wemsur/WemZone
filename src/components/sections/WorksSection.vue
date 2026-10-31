@@ -4,6 +4,7 @@ import { onBeforeUnmount, onMounted, ref, type ComponentPublicInstance } from 'v
 import { useCamera, useCameraFrame } from '@/composables/useCamera'
 import { PROJECTS } from '@/data/projects'
 import { shuffle } from '@/lib/shuffle'
+import { narrow } from '@/lib/viewport'
 
 /**
  * 其它作品 —— 弹幕式项目列表
@@ -90,15 +91,17 @@ function frame(now: number): void {
   last = now
 
   const index = camera.engine.displayIndex
-  if (!inRange(index)) {
+  // 窄版没有相机帧（世界不挂载），滚动是原生的：两行常驻跑，不做进出场偏移
+  const mobile = narrow.value
+  if (!mobile && !inRange(index)) {
     // 离开本区：停掉循环，等相机再靠近时由 sync 唤醒
     last = 0
     return
   }
 
   const W = window.innerWidth
-  const enter = smoothstep(1.5, 2.22, index)
-  const exit = smoothstep(2.72, 3.28, index)
+  const enter = mobile ? 1 : smoothstep(1.5, 2.22, index)
+  const exit = mobile ? 0 : smoothstep(2.72, 3.28, index)
 
   // 指数逼近目标速度 → 快速减速而不是硬停
   const k = 1 - Math.exp(-dt / DECEL_TAU)
@@ -124,7 +127,8 @@ function frame(now: number): void {
 
 function sync(index: number): void {
   if (reduced) return
-  if (inRange(index) && raf === 0) {
+  const shouldRun = narrow.value || inRange(index)
+  if (shouldRun && raf === 0) {
     last = 0
     raf = requestAnimationFrame(frame)
   }
@@ -132,19 +136,46 @@ function sync(index: number): void {
 
 useCameraFrame((f) => sync(f.index))
 
+function onResize(): void {
+  measure()
+}
+
+const root = ref<HTMLElement | null>(null)
+/** 窄版没有相机帧，用可见性判断「这一节在不在屏幕上」来开关循环 */
+let io: IntersectionObserver | null = null
+
 onMounted(() => {
   measure()
-  sync(camera.engine.displayIndex)
+  window.addEventListener('resize', onResize, { passive: true })
+  if (narrow.value && typeof IntersectionObserver !== 'undefined' && root.value) {
+    io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) sync(camera.engine.displayIndex)
+        else if (raf !== 0) {
+          cancelAnimationFrame(raf)
+          raf = 0
+          last = 0
+        }
+      }
+    })
+    io.observe(root.value)
+  } else {
+    // 宽版由相机索引驱动（useCameraFrame）
+    sync(camera.engine.displayIndex)
+  }
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', onResize)
+  io?.disconnect()
+  io = null
   if (raf !== 0) cancelAnimationFrame(raf)
   raf = 0
 })
 </script>
 
 <template>
-  <div class="works">
+  <div ref="root" class="works">
     <header class="head">
       <h2 class="title">其它作品</h2>
       <p class="lead">启动器之外的一些东西。</p>
@@ -315,9 +346,48 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
+@media (max-width: 900px) and (orientation: portrait) {
+  .works {
+    gap: 1.5rem;
+    padding: 3.6rem 0 1.4rem;
+    justify-content: center;
+  }
+  .head {
+    padding: 0 1.35rem;
+  }
+  .title {
+    font-size: 1.55rem;
+  }
+  .lead {
+    margin-top: 0.35rem;
+    font-size: 0.9rem;
+  }
+  .rows {
+    gap: 0.85rem;
+  }
+  .track,
+  .copy {
+    gap: 0.8rem;
+  }
+  /* 竖屏一屏只有 24rem 上下：卡片缩到能同时看到两张半，才读得出「无尽轨道」 */
+  .project {
+    width: 14.5rem;
+    height: 8.6rem;
+    padding: 0.9rem 1rem;
+    gap: 0.3rem;
+  }
+  .name {
+    font-size: 1.05rem;
+  }
+  .desc {
+    font-size: 0.82rem;
+    -webkit-line-clamp: 2;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .track {
-    /* 减少动效时不做无缝滚动：让轨道静止，用户可以横向滚动查看 */
+    /* 减少动效时不做无缝滚动：让轨道静止，用户可以横向查看 */
     will-change: auto;
   }
 }
