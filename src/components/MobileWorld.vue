@@ -2,6 +2,7 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 import Background from '@/components/Background.vue'
+import { sectionBgMask } from '@/lib/bgMask'
 import { ACTIVE_SECTIONS } from '@/sections'
 
 /**
@@ -29,6 +30,24 @@ const active = ref(0)
 
 let raf = 0
 let cleanup: (() => void) | null = null
+
+/**
+ * 区块背景的竖直渐隐（与宽版同一套几何算法，见 lib/bgMask.ts）。
+ *
+ * 窄版一节就是 100svh，相邻两节正好相距一屏，所以「两区中点」落在
+ * 屏幕边缘上 —— 渐隐带一半在视野内、一半在外，这正是原生滚动下
+ * 两块背景在滑动途中互相交融的位置。
+ *
+ * 背景高度在窄版是 150%（见 main.css），所以 bgFactor 取 1.5。
+ */
+const bgMask = ref('')
+
+function updateBgMask(): void {
+  const root = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+  const sectionH = window.innerHeight / root
+  const mask = sectionBgMask({ sectionH, bgFactor: 1.5, spacing: sectionH, bleed: 1 })
+  bgMask.value = mask
+}
 
 /**
  * 计算每节相对视口中心的偏移，用于驱动轻微缩放。
@@ -66,16 +85,22 @@ function schedule(): void {
   raf = requestAnimationFrame(measure)
 }
 
+function onResize(): void {
+  schedule()
+  updateBgMask()
+}
+
 onMounted(() => {
   const el = root.value
   if (!el) return
   el.addEventListener('scroll', schedule, { passive: true })
-  window.addEventListener('resize', schedule, { passive: true })
+  window.addEventListener('resize', onResize, { passive: true })
   measure()
+  updateBgMask()
 
   cleanup = () => {
     el.removeEventListener('scroll', schedule)
-    window.removeEventListener('resize', schedule)
+    window.removeEventListener('resize', onResize)
     if (raf !== 0) cancelAnimationFrame(raf)
     raf = 0
   }
@@ -118,6 +143,7 @@ function sectionStyle(i: number): Record<string, string> {
       <!-- 背景跟着这一节滚动，与宽版同一套场景组件 -->
       <div
                   :class="['section-bg', { 'section-bg--last': i === ACTIVE_SECTIONS.length - 1 }]"
+                  :style="{ 'mask-image': bgMask, '-webkit-mask-image': bgMask }"
                   aria-hidden="true"
                 >
         <Background :kind="section.background" :hue="section.hue ?? 18" />

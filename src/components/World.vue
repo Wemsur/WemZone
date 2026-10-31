@@ -7,6 +7,7 @@ import { useCamera } from '@/composables/useCamera'
 import { applyBlur, clearBlur, type BlurMode, type BlurTargets } from '@/engine/blur'
 import { CAMERA } from '@/engine/constants'
 import { staticSectionTransform } from '@/engine/world'
+import { sectionBgMask } from '@/lib/bgMask'
 import { overviewOn } from '@/lib/overview'
 import { ACTIVE_SECTIONS } from '@/sections'
 
@@ -101,6 +102,37 @@ function sectionStyle(index: number): Record<string, string> {
 const probe = ref<HTMLElement | null>(null)
 const viewportRem = reactive({ w: 0, h: 0 })
 
+/** 区块出血系数：与 sectionSize() 里的 k 一致 */
+const SECTION_BLEED = 1.04
+/** 背景相对区块的高度倍率：与 main.css 的 .section-bg 一致 */
+const BG_FACTOR = 2
+
+/**
+ * 区块背景的竖直渐隐带 —— 按真实几何算（见 lib/bgMask.ts）。
+ *
+ * 关键点是**渐隐带以两区中点为中心**：这样相邻两块背景在过渡时正好
+ * 一进一出、在中点交汇；写死百分比时，默认间距下勉强成立，改间距就错位。
+ */
+function bgMaskStyle(index: number): Record<string, string> {
+  if (viewportRem.h === 0) return {}
+  void camera.geometryVersion.value
+  const stops = camera.engine.path.stops
+  const sectionH = viewportRem.h * SECTION_BLEED
+  const prev = stops[index - 1]
+  const next = stops[index + 1]
+  const spacing =
+    next && prev
+      ? (next.y - prev.y) / 2
+      : next
+        ? next.y - stops[index].y
+        : prev
+          ? stops[index].y - prev.y
+          : sectionH
+  const mask = sectionBgMask({ sectionH, bgFactor: BG_FACTOR, spacing })
+  // 用连字符键：Vue 会对它们走 setProperty，`-webkit-` 前缀才会被原样保留
+  return { 'mask-image': mask, '-webkit-mask-image': mask }
+}
+
 function measureViewport(): void {
   if (!probe.value) return
   const rootFont = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
@@ -116,7 +148,7 @@ function sectionSize(): Record<string, string> {
   // 出血：空闲晃动会把整个视口平移最多约 13px，转场时还有最多 3.2° 的动态
   // 倾斜会让投影略微缩水。区块按 100% 给就会在晃动到极端时露出一条背景。
   // 4% 的出血保证任何姿态下都铺满视野（内容外侧应留出安全边距）。
-  const k = 1.04
+  const k = SECTION_BLEED
   return {
     width: `${(viewportRem.w * k).toFixed(3)}rem`,
     height: `${(viewportRem.h * k).toFixed(3)}rem`,
@@ -171,6 +203,7 @@ onBeforeUnmount(() => {
                      尺寸比区块大，相邻区块的背景在区块之间重叠并交叉渐隐。 -->
                 <div
                   :class="['section-bg', { 'section-bg--last': i === ACTIVE_SECTIONS.length - 1 }]"
+                  :style="bgMaskStyle(i)"
                   aria-hidden="true"
                 >
                   <Background :kind="section.background" :hue="section.hue ?? 18" />
