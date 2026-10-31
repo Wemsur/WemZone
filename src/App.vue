@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import MobileWorld from '@/components/MobileWorld.vue'
 import HomeSection from '@/components/sections/HomeSection.vue'
+import ContactSection from '@/components/sections/ContactSection.vue'
 import HomeTopBar from '@/components/sections/HomeTopBar.vue'
 import WorksSection from '@/components/sections/WorksSection.vue'
 import UnifiedCard from '@/components/sections/UnifiedCard.vue'
@@ -57,6 +58,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     <template v-for="section in ACTIVE_SECTIONS" :key="section.id" #[section.id]>
       <HomeSection v-if="section.id === 'home'" />
       <WorksSection v-else-if="section.id === 'works'" />
+      <ContactSection v-else-if="section.id === 'contact'" />
       <div v-else class="placeholder">
         <span class="placeholder-index">{{ section.label }}</span>
       </div>
@@ -67,6 +69,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     <template v-for="section in ACTIVE_SECTIONS" :key="section.id" #[section.id]>
       <HomeSection v-if="section.id === 'home'" />
       <WorksSection v-else-if="section.id === 'works'" />
+      <ContactSection v-else-if="section.id === 'contact'" />
       <div v-else class="placeholder">
         <span class="placeholder-index">{{ section.label }}</span>
       </div>

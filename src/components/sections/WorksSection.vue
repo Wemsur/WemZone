@@ -158,7 +158,7 @@ onBeforeUnmount(() => {
             <a
               v-for="p in PROJECTS"
               :key="`${c}-${p.name}`"
-              class="card"
+              class="project"
               :href="p.href"
               target="_blank"
               rel="noopener noreferrer"
@@ -182,7 +182,7 @@ onBeforeUnmount(() => {
             <a
               v-for="p in PROJECTS"
               :key="`${c}-${p.name}`"
-              class="card"
+              class="project"
               :href="p.href"
               target="_blank"
               rel="noopener noreferrer"
@@ -256,7 +256,7 @@ onBeforeUnmount(() => {
 }
 
 /* --- 卡片 --- */
-.card {
+.project {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -277,7 +277,7 @@ onBeforeUnmount(() => {
     background-color 220ms ease;
 }
 
-.card:hover {
+.project:hover {
   border-color: color-mix(in srgb, var(--wz-brand-soft) 45%, transparent);
   background:
     linear-gradient(160deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0.02)),
