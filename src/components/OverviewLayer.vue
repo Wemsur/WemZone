@@ -107,12 +107,34 @@ function overviewDistance(): number {
   return Math.max(dW, dH)
 }
 
+/** 当前总览距离（0 = 不在总览）。用来把「屏幕像素」换算回世界单位。 */
+const overviewD = ref(0)
+
+/**
+ * 1 屏幕像素等于多少世界 rem：屏幕 px = rem × 根字号 × (P / d)。
+ *
+ * SVG 里的 `rem` **不是**用户单位 —— `font-size: 4.6rem` 会先算成
+ * 4.6×根字号 CSS px，再当作用户单位，于是比预期大一个根字号倍率
+ * （实测标签有 90px 高）。所以尺寸一律按屏幕像素反推成世界单位。
+ */
+function worldPerPx(): number {
+  const root = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+  return overviewD.value / (root * CAMERA.PERSPECTIVE)
+}
+
+const labelSize = computed(() => 12 * worldPerPx())
+const stopR = computed(() => 3.4 * worldPerPx())
+const cameraR = computed(() => 4.6 * worldPerPx())
+
 function apply(): void {
   if (!overviewOn.value) {
+    overviewD.value = 0
     camera.engine.setOverview(false)
     return
   }
-  camera.engine.setOverview(true, overviewDistance())
+  const d = overviewDistance()
+  overviewD.value = d
+  camera.engine.setOverview(true, d)
   // setOverview 的 emitFrame 发生在 v-if 挂载 SVG 之前，marker 还是 null；
   // 等 DOM 更新完再手动放一次，否则标记停在 (0, 0)。
   void nextTick(placeMarker)
@@ -179,12 +201,19 @@ onBeforeUnmount(() => {
 
     <!-- 停靠点 + 区块名 -->
     <g v-for="(s, i) in stops" :key="s.id">
-      <circle class="ov-stop" :cx="s.x" :cy="s.y" r="3.2" />
-      <text class="ov-label" :x="s.x + 6" :y="s.y - 5">{{ ACTIVE_SECTIONS[i]?.label }}</text>
+      <circle class="ov-stop" :cx="s.x" :cy="s.y" :r="stopR" />
+      <text
+        class="ov-label"
+        :x="s.x + stopR * 1.8"
+        :y="s.y - stopR * 0.9"
+        :font-size="labelSize"
+      >
+        {{ ACTIVE_SECTIONS[i]?.label }}
+      </text>
     </g>
 
     <!-- 相机当前位置 -->
-    <circle ref="marker" class="ov-camera" r="4.4" />
+    <circle ref="marker" class="ov-camera" :r="cameraR" />
   </svg>
 </template>
 
@@ -226,8 +255,8 @@ onBeforeUnmount(() => {
 
 .ov-label {
   fill: var(--wz-text-tertiary);
-  font-size: 4.6rem;
   font-family: var(--font-sans);
   opacity: 0.8;
+  /* 字号由 :font-size 按屏幕像素反推成世界单位（见 worldPerPx） */
 }
 </style>

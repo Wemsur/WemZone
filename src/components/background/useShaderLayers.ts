@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, type Ref } from 'vue'
 import { ShaderMount, type ShaderMountUniforms } from '@paper-design/shaders'
 
 import { getPerfProfile } from '@/lib/perf'
+import { overviewOn } from '@/lib/overview'
 
 /**
  * 在某个区块背景里挂一层 Paper Shader，并在区块离开视野时把它停下
@@ -41,7 +42,9 @@ export function useShaderLayers(layers: ShaderLayer[]): void {
   }
 
   function syncVisibility(): void {
-    const visible = inViewport(layers[0]?.host.value ?? null)
+    // 总览时所有区块同时可见 —— 让五个 WebGL 背景一起跑没有意义，
+    // 而且在远处它们只是几团色块。停掉，总览本身要的是几何关系。
+    const visible = !overviewOn.value && inViewport(layers[0]?.host.value ?? null)
     for (const { mount, baseSpeed } of mounts) {
       mount.setSpeed(visible ? baseSpeed : 0)
     }
