@@ -119,6 +119,13 @@ useCameraFrame((frame) => {
 
 const sensitivityLabel = computed(() => String(Math.round(scrollSensitivity.value * 100) / 100))
 
+/** 填充比例：0.4× → 0%，2.5× → 100% */
+const sensitivityPct = computed(() => {
+  const t =
+    (scrollSensitivity.value - SENSITIVITY_MIN) / (SENSITIVITY_MAX - SENSITIVITY_MIN)
+  return (clamp(t, 0, 1) * 100).toFixed(1)
+})
+
 onMounted(() => {
   measure()
   if (typeof ResizeObserver !== 'undefined') {
@@ -134,7 +141,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <aside ref="card" class="card" aria-label="站点导航">
+  <aside ref="card" class="unified-card" aria-label="站点导航">
     <!-- 进度条：卡片在画面右侧，所以条在卡的左侧 -->
     <div class="bars" role="tablist" aria-label="当前区块">
       <button
@@ -208,17 +215,17 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- 滑动灵敏度：悬停整张卡片时从卡片下方（下半屏时从上方）滑出。
-         这是给访客的手感设置，不是开发调试项 —— 不同设备的滚动粒度差一个
-         数量级，同一套阈值不可能对所有人都合适。 -->
+    <!-- 滑动灵敏度：与卡片等宽的扁条。
+         外层是卡片，中间那圈「像边框一样的圆角矩形」是轨道，
+         橙色从左边按当前倍率填充；不放任何文字，数值走 tooltip。 -->
     <div class="sensitivity">
       <div class="sens-panel" @wheel.stop>
-        <label class="sens-head" for="wz-sensitivity">
-          <span class="sens-title">滑动灵敏度</span>
-          <span class="sens-value">{{ sensitivityLabel }}×</span>
-        </label>
+        <div class="sens-track">
+          <div class="sens-fill" :style="{ width: `${sensitivityPct}%` }" />
+        </div>
+
+        <!-- 真正的控件：透明覆盖整块，可拖动、可键盘操作 -->
         <input
-          id="wz-sensitivity"
           v-model.number="scrollSensitivity"
           class="sens-range"
           type="range"
@@ -227,14 +234,17 @@ onBeforeUnmount(() => {
           step="0.05"
           aria-label="滑动灵敏度"
         />
-        <p class="sens-hint">滑得很费力就调大，一碰就翻页就调小</p>
+
+        <span class="sens-tip" role="tooltip">
+          滑动灵敏度：{{ sensitivityLabel }}×
+        </span>
       </div>
     </div>
   </aside>
 </template>
 
 <style scoped>
-.card {
+.unified-card {
   position: fixed;
   left: 0;
   top: 0;
@@ -341,14 +351,15 @@ onBeforeUnmount(() => {
 }
 
 /* --- 滑动灵敏度 ---
-   悬停整张卡片时滑出。面板是卡片的绝对定位子元素，所以跟着卡片一起移动；
-   `top: 100%` + padding 而不是 margin，是为了让「卡片 → 面板」之间的空隙
-   也算在悬停区域内 —— 否则鼠标穿过空隙时面板会立刻收起，够不着滑块。 */
+   与卡片**等宽**的扁条（left/right 都贴住卡片的 padding box）。面板是卡片的
+   绝对定位子元素，所以跟着卡片一起移动；`top: 100%` + padding 而不是 margin，
+   是为了让「卡片 → 面板」之间的空隙也算在悬停区域内 —— 否则鼠标穿过空隙时
+   面板会立刻收起，够不着滑块。 */
 .sensitivity {
   position: absolute;
+  left: 0;
   right: 0;
   top: 100%;
-  width: 13.5rem;
   padding-top: 0.45rem;
   opacity: 0;
   transform: translateY(-0.3rem);
@@ -359,7 +370,7 @@ onBeforeUnmount(() => {
 }
 
 /* 卡片在下半屏时面板翻到上方，避免顶出视口底边 */
-.card.flip .sensitivity {
+.unified-card.flip .sensitivity {
   top: auto;
   bottom: 100%;
   padding-top: 0;
@@ -367,101 +378,96 @@ onBeforeUnmount(() => {
   transform: translateY(0.3rem);
 }
 
-.card:hover .sensitivity,
-.card:focus-within .sensitivity {
+.unified-card:hover .sensitivity,
+.unified-card:focus-within .sensitivity {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
 }
 
+/* 外层卡片：四边等距的 padding 让内层看起来像被一圈边框包住 */
 .sens-panel {
-  padding: 0.6rem 0.7rem 0.55rem;
-  border: 1px solid rgb(255 255 255 / 0.07);
-  border-radius: 0.7rem;
+  position: relative;
+  padding: 0.3rem;
+  border-radius: 0.8rem;
   background: color-mix(in srgb, #101010 55%, transparent);
   backdrop-filter: blur(0.9rem) saturate(1.1);
   box-shadow: 0 0.6rem 2rem rgb(0 0 0 / 0.32);
+  transition: box-shadow 180ms ease;
 }
 
-.sens-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem;
+.sens-panel:focus-within {
+  box-shadow:
+    0 0.6rem 2rem rgb(0 0 0 / 0.32),
+    0 0 0 1px color-mix(in srgb, var(--wz-brand-soft) 55%, transparent);
 }
 
-.sens-title {
-  font-size: 0.72rem;
-  letter-spacing: 0.06em;
-  color: var(--wz-text-tertiary);
-}
-
-.sens-value {
-  font-family: ui-monospace, monospace;
-  font-size: 0.72rem;
-  color: var(--wz-brand-soft);
-}
-
-.sens-range {
-  appearance: none;
-  -webkit-appearance: none;
-  display: block;
-  width: 100%;
+/* 轨道：就是那圈「像边框一样」的圆角矩形，橙色在它内部从左往右填 */
+.sens-track {
+  position: relative;
   height: 0.95rem;
-  margin: 0.1rem 0 0;
-  background: transparent;
+  border-radius: 0.5rem;
+  background: rgb(255 255 255 / 0.05);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
+  overflow: hidden;
+}
+
+.sens-fill {
+  height: 100%;
+  border-radius: 0.5rem;
+  background: linear-gradient(90deg, var(--wz-brand), var(--wz-brand-soft));
+  box-shadow: 0 0 0.6rem hsl(var(--wz-brand-hue) 68% 55% / 0.45);
+  transition: width 160ms ease;
+}
+
+/* 真正的控件：透明地铺满整块面板，拖动 / 点击 / 键盘都在它上面 */
+.sens-range {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
   cursor: pointer;
 }
 
-.sens-range::-webkit-slider-runnable-track {
-  height: 2px;
-  border-radius: 1px;
-  background: rgb(255 255 255 / 0.18);
+/* tooltip：默认在扁条下方（扁条在卡片下方），翻到卡片上方时改到扁条上方 */
+.sens-tip {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.4rem);
+  padding: 0.28rem 0.5rem;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 0.42rem;
+  background: color-mix(in srgb, #0d0d0d 88%, transparent);
+  backdrop-filter: blur(0.5rem);
+  font-size: 0.68rem;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: var(--wz-text-primary);
+  opacity: 0;
+  transform: translateY(-0.15rem);
+  pointer-events: none;
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
 }
 
-.sens-range::-webkit-slider-thumb {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 0.62rem;
-  height: 0.62rem;
-  margin-top: -0.26rem;
-  border: 0;
-  border-radius: 50%;
-  background: var(--wz-brand-soft);
-  box-shadow: 0 0 0 0.18rem hsl(var(--wz-brand-hue) 72% 75% / 0.18);
-  transition: box-shadow 160ms ease;
+.sens-panel:hover .sens-tip,
+.sens-panel:focus-within .sens-tip {
+  opacity: 1;
+  transform: translateY(0);
 }
 
-.sens-range::-webkit-slider-thumb:hover {
-  box-shadow: 0 0 0 0.3rem hsl(var(--wz-brand-hue) 72% 75% / 0.26);
+.unified-card.flip .sens-tip {
+  top: auto;
+  bottom: calc(100% + 0.4rem);
+  transform: translateY(0.15rem);
 }
 
-.sens-range::-moz-range-track {
-  height: 2px;
-  border-radius: 1px;
-  background: rgb(255 255 255 / 0.18);
-}
-
-.sens-range::-moz-range-thumb {
-  width: 0.62rem;
-  height: 0.62rem;
-  border: 0;
-  border-radius: 50%;
-  background: var(--wz-brand-soft);
-}
-
-.sens-range:focus-visible {
-  outline: 1px solid var(--wz-brand-soft);
-  outline-offset: 0.2rem;
-  border-radius: 0.3rem;
-}
-
-.sens-hint {
-  margin: 0.3rem 0 0;
-  font-size: 0.62rem;
-  line-height: 1.5;
-  letter-spacing: 0.02em;
-  color: var(--wz-text-tertiary);
-  opacity: 0.72;
+.unified-card.flip .sens-panel:hover .sens-tip,
+.unified-card.flip .sens-panel:focus-within .sens-tip {
+  transform: translateY(0);
 }
 </style>
