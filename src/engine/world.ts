@@ -51,8 +51,15 @@ const DEG = Math.PI / 180
  * @param world   `#world` 元素
  * @param pose    当前相机位姿
  * @param P       透视距离（rem）
+ * @param compensate 是否按 `d/P` 把相机位置缩放到「渲染平面」坐标。
+ *   正常浏览为 true；总览为 false（那时区块不做距离补偿，位置也在设计坐标上）。
  */
-export function renderPose(world: HTMLElement, pose: CameraPose, P: number): void {
+export function renderPose(
+  world: HTMLElement,
+  pose: CameraPose,
+  P: number,
+  compensate = true,
+): void {
   // **符号必须与下面 transform 里写的 rotateX/rotateY 完全一致。**
   //
   // 这里曾经用 `-pose.rx` 算补偿、却写 `rotateX(+pose.rx)` —— 两者反号，
@@ -64,6 +71,14 @@ export function renderPose(world: HTMLElement, pose: CameraPose, P: number): voi
   const a = pose.rx * DEG
   const b = pose.ry * DEG
 
+  // 相机位置要落在**渲染平面**的坐标里：区块的静态 transform 用
+  // `translate3d(x·s, y·s) scale(s)`，位置和尺寸都乘了 s = d/P。
+  // 若这里仍用未缩放的 (x, y)，相机会朝着一个比区块远 4.4 倍的坐标看，
+  // 画面就偏了 —— 而且区块间距在屏幕上会变成「好几屏」，背景自然接不上。
+  const s = compensate ? pose.d / P : 1
+  const px = pose.x * s
+  const py = pose.y * s
+
   // R·(px, py, 0)，R = rotateX(a) · rotateY(b)（与下面 transform 列表的顺序一致）
   const cosA = Math.cos(a)
   const sinA = Math.sin(a)
@@ -71,11 +86,11 @@ export function renderPose(world: HTMLElement, pose: CameraPose, P: number): voi
   const sinB = Math.sin(b)
 
   // rotateY(b) 先作用于点
-  const x1 = pose.x * cosB
-  const z1 = -pose.x * sinB
+  const x1 = px * cosB
+  const z1 = -px * sinB
   // 再 rotateX(a)
-  const y2 = pose.y * cosA - z1 * sinA
-  const z2 = pose.y * sinA + z1 * cosA
+  const y2 = py * cosA - z1 * sinA
+  const z2 = py * sinA + z1 * cosA
 
   const tx = -x1
   const ty = -y2
@@ -101,8 +116,11 @@ export function renderPose(world: HTMLElement, pose: CameraPose, P: number): voi
  */
 export function staticSectionTransform(stop: Stop, P: number, compensate = true): string {
   const s = compensate ? stop.d / P : 1
+  // **位置也要乘 s**：补偿的作用是让「一屏的世界尺寸 = 一屏的屏幕尺寸」，
+  // 区块之间的间距（72rem）同样要按这个比例落到世界里，否则区块在屏幕上
+  // 会相隔四五屏、背景根本接不上（总览里 scale = 1，看起来才是对的）。
   return (
-    `translate3d(${round(stop.x)}rem, ${round(stop.y)}rem, 0) ` +
+    `translate3d(${round(stop.x * s)}rem, ${round(stop.y * s)}rem, 0) ` +
     `scale(${round(s, 6)}) translate(-50%, -50%)`
   )
 }

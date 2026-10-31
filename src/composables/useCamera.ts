@@ -31,6 +31,7 @@ import {
 import { createCamera, buildStops, type CameraFrame, type Engine } from '@/engine'
 import { CAMERA } from '@/engine/constants'
 import { renderPose } from '@/engine/world'
+import { overviewOn } from '@/lib/overview'
 import { scrollSensitivity } from '@/lib/preferences'
 
 export interface CameraApi {
@@ -73,7 +74,8 @@ export function provideCamera(): CameraApi {
   // 每帧写 #world —— 全站唯一的每帧 DOM 写入点
   let worldEl: HTMLElement | null = null
   const stopFrame = engine.subscribe((frame: CameraFrame) => {
-    if (worldEl) renderPose(worldEl, frame.pose, CAMERA.PERSPECTIVE)
+    // 总览时区块不做距离补偿，相机位置也就不能按 d/P 缩放
+    if (worldEl) renderPose(worldEl, frame.pose, CAMERA.PERSPECTIVE, !overviewOn.value)
     // 只在状态名变化时碰响应式
     if (state.value !== frame.state) state.value = frame.state
   })

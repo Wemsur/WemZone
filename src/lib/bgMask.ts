@@ -3,31 +3,26 @@
  *
  * ## 目标
  *
- * 1. **静止时视野内永远满不透明**。渐隐带不能出现在屏幕里，否则用户看到的是
+ * 1. **静止时视野内满不透明**。渐隐带不能出现在屏幕里，否则用户看到的是
  *    「背景在视野边缘就开始发灰」，而不是一整个背景。
- * 2. **相邻两块背景在中点附近交汇**。上一块淡出、下一块淡入，过渡时两块
- *    背景真正「交融」，而不是各自淡到黑。
+ * 2. **整段间隙都用来渐变**：本区**下边缘**一直渐变到下一区**上边缘**。
+ *    这两条边之间正好是「本区看不见的部分」，把整段都做成渐变，两块背景
+ *    才是真正交融；只留一条窄带的话，看起来仍像各自淡出到黑。
  * 3. **任何窗口比例下都不能变成一条横条**。视野比区块间距还高时（非 16:9
- *    的窗口很容易如此），中点已经落在屏幕内 —— 此时若还坚持「渐隐带必须
- *    在中点、且不伸进视野」，带子会被压成 1px，背景就只剩中间一条。
+ *    的窗口很容易如此），两区可见区域已经重叠、不存在「间隙」，此时退化成
+ *    贴着视野边缘的一条窄带 —— 但那仍然是「屏幕内满不透明」。
  *
- * ## 做法：内侧边界取「可见边缘」与「中点」中更远的那个
+ * ## 换算
  *
- * 设 `visibleHalf` 为可见半高、`mid` 为两区中点距本区中心的距离：
+ * 设 `visibleHalf` 为可见半高、`spacing` 为区块间距：
  *
- *  - `inner`（仍完全不透明处）= `max(visibleHalf + 0.6, mid − 0.8)`：
- *    永远盖满一屏；中点更远时贴着中点。
- *  - `outer`（完全透明处）= `max(inner + 1.6, mid + 1.6)`：
- *    带子至少 1.6rem 宽，并越过中点。
+ *  - 内侧边界（仍完全不透明） = `visibleHalf` —— 正好在视野边缘；
+ *  - 外侧边界（完全透明） = `spacing − visibleHalf` —— 正好在下一区的视野边缘。
  *
- * 下一区背景是按 DOM 顺序画在上面的，且它自己的 `inner` 同样保证盖满一屏 ——
- * 所以本区在中点之后的淡出**被下一区盖住**，看不见；真正可见的交汇发生在
- * 下一区的淡入段（从它的顶边到它的 `inner`）压在本区不透明的底上。
+ * 两区可见区域重叠时（`spacing < 2·visibleHalf`），外侧会落回内侧 + 最小带宽。
  *
- * 反过来，若视野特别高（`mid < visibleHalf`），`inner` 会大于 `mid`：
- * 本区的淡出整体落在屏幕外、并被下一区覆盖，屏幕上看到的仍是完整背景。
- *
- * 一句话：**可见的那一半永远是实心的，淡出是给下一区垫背的**。
+ * 下一区背景按 DOM 顺序画在上面、且在它自己的可见区域内不透明，所以本区
+ * 淡出的后半段被下一区盖住；真正可见的交叉渐变恰好铺满两区之间的间隙。
  */
 
 export interface BgMaskOptions {
@@ -44,8 +39,6 @@ export interface BgMaskOptions {
   bleed?: number
 }
 
-/** 渐隐带相对「可见边缘」再往外让出的距离（rem） */
-const OUTSIDE = 0.6
 /** 淡出带的最小宽度（rem）——再窄就和硬边没区别了 */
 const MIN_BAND = 1.6
 
@@ -55,12 +48,11 @@ export function sectionBgMask(opts: BgMaskOptions): string {
   const bgH = sectionH * bgFactor
   const bgHalf = bgH / 2
   const visibleHalf = sectionH / bleed / 2
-  const mid = spacing / 2
 
-  // 内侧边界：至少盖满一屏；中点更远时贴着中点
-  const inner = Math.min(bgHalf - MIN_BAND, Math.max(visibleHalf + OUTSIDE, mid - 0.8))
-  // 外侧边界：至少 MIN_BAND 宽，并越过中点
-  const outer = Math.min(bgHalf, Math.max(inner + MIN_BAND, mid + MIN_BAND))
+  // 内侧边界：正好在视野边缘（视野内永远不透明）
+  const inner = Math.max(0, Math.min(bgHalf - MIN_BAND, visibleHalf))
+  // 外侧边界：正好在下一区的视野边缘 —— 整段间隙都是渐变
+  const outer = Math.min(bgHalf, Math.max(inner + MIN_BAND, spacing - visibleHalf))
 
   /** rem（距背景顶边）→ 百分比 */
   const pct = (rem: number): string =>

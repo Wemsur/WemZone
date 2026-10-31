@@ -65,11 +65,16 @@ describe('区块背景渐隐带', () => {
     }
   })
 
-  it('间距调大时渐隐带整体外移', () => {
+  it('间距调大时，渐变从视野边缘一直延伸到下一区的上边缘', () => {
     const small = geometry(58.5, 60)
     const large = geometry(58.5, 100)
+    // 内侧永远贴着视野边缘（视野内不淡）
+    expect(small.inner).toBeCloseTo(small.visibleHalf, 1)
+    expect(large.inner).toBeCloseTo(large.visibleHalf, 1)
+    // 外侧跟着下一区的上边缘走（背景不够高时被自己的边截住）
+    expect(small.outer).toBeCloseTo(Math.min(small.bgH / 2, 60 - small.visibleHalf), 1)
+    expect(large.outer).toBeCloseTo(Math.min(large.bgH / 2, 100 - large.visibleHalf), 1)
     expect(large.outer).toBeGreaterThan(small.outer)
-    expect(large.inner).toBeGreaterThan(small.inner)
   })
 
   it('横向渐隐仍然存在（两块 mask 用 intersect 合成）', () => {
@@ -85,6 +90,7 @@ describe('区块背景渐隐带', () => {
       sectionBgMask({ sectionH, bgFactor: 1.5, spacing: sectionH, bleed: 1 }),
     )
     const inner = bgH / 2 - (topInner / 100) * bgH
-    expect(inner).toBeGreaterThanOrEqual(sectionH / 2)
+    // 百分比保留两位小数，允许 0.05rem 的舍入
+    expect(inner).toBeGreaterThanOrEqual(sectionH / 2 - 0.05)
   })
 })
