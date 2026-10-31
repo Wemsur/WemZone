@@ -243,10 +243,6 @@ function playText(n: number): string {
 
       </div>
     </div>
-
-    <!-- 左上角渐变遮罩：文字压在卡片上时保证可读。
-         从左上角 50% 不透明度渐隐到画面中心 0%。 -->
-    <div class="corner-scrim" aria-hidden="true" />
   </div>
 </template>
 
@@ -262,15 +258,17 @@ function playText(n: number): string {
 .head {
   position: absolute;
   left: 4.5rem;
-  top: 4.2rem;
+  top: 3.4rem;
   z-index: 2;
-  max-width: 30rem;
+  width: min(30rem, 80%);
+  /* 整块仍然贴在左上角，只让大字与小字彼此居中对齐 */
+  text-align: center;
   pointer-events: none;
 }
 
 .title {
   margin: 0;
-  font-size: 2.7rem;
+  font-size: 3.4rem;
   font-weight: 600;
   letter-spacing: 0.12em;
   color: var(--wz-text-primary);
@@ -279,7 +277,7 @@ function playText(n: number): string {
 
 .lead {
   margin: 0.55rem 0 0;
-  font-size: 1.18rem;
+  font-size: 1.32rem;
   line-height: 1.75;
   letter-spacing: 0.03em;
   color: var(--wz-text-tertiary);
@@ -307,19 +305,10 @@ function playText(n: number): string {
 .stage-mask {
   position: absolute;
   inset: 0;
-  mask-image: radial-gradient(ellipse 78% 82% at 50% 50%, #000 58%, transparent 100%);
-  -webkit-mask-image: radial-gradient(ellipse 78% 82% at 50% 50%, #000 58%, transparent 100%);
-}
-
-/* 左上角的暗色雾：把卡片压暗，给标题让出可读区。
-   注意这是**遮罩（scrim）**，不是 alpha mask —— 卡片不该消失，
-   只是变暗；从左上 50% 不透明度平滑过渡到画面中心 0%。 */
-.corner-scrim {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background: radial-gradient(circle at 0% 0%, rgb(9 9 11 / 0.5) 0%, rgb(9 9 11 / 0) 58%);
+  /* 只在**左上角**让卡片变半透明（给标题让出可读区）。
+     右下角不应该渐隐 —— 之前加的径向边缘 mask 把四边都淡掉了。 */
+  mask-image: linear-gradient(to bottom right, rgb(0 0 0 / 0.5) 0%, #000 52%);
+  -webkit-mask-image: linear-gradient(to bottom right, rgb(0 0 0 / 0.5) 0%, #000 52%);
 }
 
 .row {
