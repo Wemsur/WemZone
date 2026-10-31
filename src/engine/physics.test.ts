@@ -79,6 +79,45 @@ describe('积分器', () => {
     // 过冲会随刷新率变化。
     expect(FIXED_STEP).toBeLessThanOrEqual(1 / 240)
   })
+
+  it('越界时由更软、阻尼更大的边界弹簧拉回', () => {
+    const p: PhysicsParams = {
+      k: 450,
+      damping: 42,
+      maxSpeed: 12,
+      anchorSaturation: 0.5,
+      bounds: { min: 0, max: 4 },
+      edgeStiffness: 280,
+      edgeDamping: 55,
+    }
+    // 在首页之上：应当被朝正方向推回
+    const below = advance({ s: -0.05, v: 0 }, 0, 0, 1 / 240, p)
+    expect(below.v).toBeGreaterThan(0)
+    // 在末页之下：应当被朝负方向推回
+    const above = advance({ s: 4.05, v: 0 }, 4, 0, 1 / 240, p)
+    expect(above.v).toBeLessThan(0)
+
+    // 边界弹簧比内部软：同样 0.05 的偏移，回推速度明显更小
+    const inside = advance({ s: 0.05, v: 0 }, 0, 0, 1 / 240, {
+      ...p,
+      bounds: undefined,
+    })
+    expect(Math.abs(below.v)).toBeLessThan(Math.abs(inside.v))
+  })
+
+  it('边界外不再受周期势能影响（不会被拉向不存在的上一页）', () => {
+    const p: PhysicsParams = {
+      k: 450,
+      damping: 42,
+      maxSpeed: 12,
+      bounds: { min: 0, max: 4 },
+      edgeStiffness: 280,
+      edgeDamping: 55,
+    }
+    // 在 −0.6 处，周期势能会把人拉向 −1；有边界时必须是朝 0 拉回
+    const out = advance({ s: -0.6, v: 0 }, 0, 0, 1 / 240, p)
+    expect(out.v).toBeGreaterThan(0)
+  })
 })
 
 describe('静止判定', () => {

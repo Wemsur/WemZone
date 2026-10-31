@@ -21,6 +21,12 @@ const emit = defineEmits<{ 'update:blurMode': [BlurMode] }>()
 
 const camera = useCamera()
 
+/**
+ * 默认收起成一个小圆按钮，点击才展开。
+ * 调参是偶发操作，面板常驻会一直挡着画面。
+ */
+const collapsed = ref(true)
+
 /* ---- 常量定义：分组 + 范围 ---- */
 
 interface Knob {
@@ -260,10 +266,36 @@ const blur = computed({
 </script>
 
 <template>
-  <aside class="tuner">
+  <!-- 收起时只剩这个圆按钮 -->
+  <button
+    v-if="collapsed"
+    class="tuner-fab"
+    type="button"
+    aria-label="打开调参面板"
+    title="调参面板"
+    @click="collapsed = false"
+  >
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M4 7h10M18 7h2M4 12h4M12 12h8M4 17h12M20 17h0"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.7"
+        stroke-linecap="round"
+      />
+      <circle cx="15.5" cy="7" r="1.8" fill="currentColor" />
+      <circle cx="9.5" cy="12" r="1.8" fill="currentColor" />
+      <circle cx="17.5" cy="17" r="1.8" fill="currentColor" />
+    </svg>
+  </button>
+
+  <aside v-else class="tuner">
     <header class="tuner-head">
       <strong>调参面板</strong>
-      <span class="mono">{{ hud.state }} · i={{ hud.index }} · v={{ hud.speed }}</span>
+      <div class="head-right">
+        <span class="mono">{{ hud.state }} · i={{ hud.index }} · v={{ hud.speed }}</span>
+        <button class="close" type="button" aria-label="收起面板" @click="collapsed = true">×</button>
+      </div>
     </header>
 
     <div class="tuner-body">
@@ -354,6 +386,40 @@ const blur = computed({
 </template>
 
 <style scoped>
+.tuner-fab {
+  position: fixed;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 60;
+  width: 2.6rem;
+  height: 2.6rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--wz-surface-4);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--wz-surface-2) 88%, transparent);
+  backdrop-filter: blur(0.6rem);
+  color: var(--wz-text-tertiary);
+  cursor: pointer;
+  box-shadow: 0 0.4rem 1.4rem rgb(0 0 0 / 0.35);
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.tuner-fab:hover {
+  color: var(--wz-text-primary);
+  background: color-mix(in srgb, var(--wz-surface-3) 92%, transparent);
+  transform: scale(1.05);
+}
+
+.tuner-fab svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
 .tuner {
   position: fixed;
   top: 1rem;
@@ -371,6 +437,32 @@ const blur = computed({
   font-size: 0.75rem;
   user-select: none;
   box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 0.45);
+}
+
+.head-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.close {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0.3rem;
+  background: transparent;
+  color: var(--wz-text-tertiary);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.close:hover {
+  background: rgb(255 255 255 / 0.06);
+  color: var(--wz-text-primary);
 }
 
 .tuner-head {

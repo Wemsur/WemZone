@@ -184,7 +184,7 @@ onBeforeUnmount(() => {
 
 .line {
   margin: 0;
-  font-size: 0.98rem;
+  font-size: 1.14rem;
   line-height: 1.7;
   letter-spacing: 0.04em;
   color: var(--wz-text-default);
@@ -220,7 +220,7 @@ onBeforeUnmount(() => {
 
 .from {
   margin: 0.35rem 0 0;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   letter-spacing: 0.08em;
   color: var(--wz-text-tertiary);
   opacity: 0.7;

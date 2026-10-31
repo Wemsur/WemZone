@@ -54,7 +54,7 @@ import Hitokoto from '@/components/sections/Hitokoto.vue'
 
 .tingyu {
   font-family: 'XuanZong', serif;
-  font-size: 5.6rem;
+  font-size: 7rem;
   line-height: 0.92;
   letter-spacing: 0.04em;
   color: var(--wz-text-primary);
@@ -63,7 +63,7 @@ import Hitokoto from '@/components/sections/Hitokoto.vue'
 }
 
 .wordmark {
-  height: 2.05rem;
+  height: 2.7rem;
   width: auto;
   color: var(--wz-brand-soft);
   /* SVG 的 viewBox 基线在字体 ascender 上，往下压一点与汉字视觉对齐 */
@@ -72,7 +72,7 @@ import Hitokoto from '@/components/sections/Hitokoto.vue'
 
 .tagline {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.18rem;
   letter-spacing: 0.16em;
   color: var(--wz-text-tertiary);
   opacity: 0.92;
@@ -81,10 +81,10 @@ import Hitokoto from '@/components/sections/Hitokoto.vue'
 
 @media (max-width: 900px) and (orientation: portrait) {
   .tingyu {
-    font-size: 4rem;
+    font-size: 5rem;
   }
   .wordmark {
-    height: 1.5rem;
+    height: 2rem;
   }
 }
 </style>

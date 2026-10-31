@@ -273,13 +273,13 @@ onBeforeUnmount(() => {
 
 .name {
   font-family: 'XuanZong', serif;
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   line-height: 1;
   letter-spacing: 0.04em;
 }
 
 .wordmark {
-  height: 0.58rem;
+  height: 0.66rem;
   width: auto;
   color: var(--wz-brand-soft);
   transform: translateY(0.03rem);
@@ -303,7 +303,7 @@ onBeforeUnmount(() => {
 }
 
 .icon svg {
-  width: 1rem;
-  height: 1rem;
+  width: 1.1rem;
+  height: 1.1rem;
 }
 </style>

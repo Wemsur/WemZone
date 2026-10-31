@@ -32,7 +32,10 @@ function smoothstep(a: number, b: number, x: number): number {
 useCameraFrame((frame) => {
   const el = panel.value
   if (!el) return
-  const t = smoothstep(0.9, 1.5, frame.index)
+  // 必须在索引到 1 之前就落位：之前写成 0.9 → 1.5，静止在 1 时 t 只有 0.07，
+  // 截图几乎完全透明 —— 看起来就是「动画没做」。
+  // 现在从半程开始，到 0.97 就完全到位。
+  const t = smoothstep(0.5, 0.97, frame.index)
   // t=0：在右上、更远、更小；t=1：落到左侧原位
   el.style.opacity = t.toFixed(3)
   el.style.transform =
@@ -102,7 +105,7 @@ useCameraFrame((frame) => {
 
 .title {
   margin: 0;
-  font-size: 2.1rem;
+  font-size: 2.9rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--wz-text-primary);
@@ -110,7 +113,7 @@ useCameraFrame((frame) => {
 
 .lead {
   margin: 0.9rem 0 0;
-  font-size: 0.95rem;
+  font-size: 1.08rem;
   line-height: 1.8;
   letter-spacing: 0.03em;
   color: var(--wz-text-tertiary);
@@ -124,7 +127,7 @@ useCameraFrame((frame) => {
   gap: 0.45rem;
   margin-top: 1.6rem;
   padding: 0.4rem 0.1rem;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   letter-spacing: 0.1em;
   color: var(--wz-brand-soft);
   text-decoration: none;

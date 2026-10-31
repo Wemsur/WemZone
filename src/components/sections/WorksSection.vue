@@ -218,7 +218,7 @@ onBeforeUnmount(() => {
 
 .title {
   margin: 0;
-  font-size: 1.35rem;
+  font-size: 1.9rem;
   font-weight: 600;
   letter-spacing: 0.12em;
   color: var(--wz-text-primary);
@@ -226,7 +226,7 @@ onBeforeUnmount(() => {
 
 .lead {
   margin: 0.5rem 0 0;
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   letter-spacing: 0.05em;
   color: var(--wz-text-tertiary);
 }
@@ -286,7 +286,7 @@ onBeforeUnmount(() => {
 
 .tag {
   font-family: ui-monospace, monospace;
-  font-size: 0.66rem;
+  font-size: 0.72rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--wz-brand-soft);
@@ -294,14 +294,14 @@ onBeforeUnmount(() => {
 }
 
 .name {
-  font-size: 1.12rem;
+  font-size: 1.3rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--wz-text-primary);
 }
 
 .desc {
-  font-size: 0.82rem;
+  font-size: 0.92rem;
   line-height: 1.55;
   color: var(--wz-text-tertiary);
   /* 两行封顶，避免不同长度的描述把卡片撑歪 */

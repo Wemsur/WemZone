@@ -236,7 +236,7 @@ function playText(n: number): string {
 
 .title {
   margin: 0;
-  font-size: 1.35rem;
+  font-size: 1.9rem;
   font-weight: 600;
   letter-spacing: 0.12em;
   color: var(--wz-text-primary);
@@ -245,7 +245,7 @@ function playText(n: number): string {
 
 .lead {
   margin: 0.55rem 0 0;
-  font-size: 0.85rem;
+  font-size: 1rem;
   line-height: 1.75;
   letter-spacing: 0.03em;
   color: var(--wz-text-tertiary);
@@ -331,7 +331,7 @@ function playText(n: number): string {
 }
 
 .vtitle {
-  font-size: 0.84rem;
+  font-size: 0.95rem;
   line-height: 1.4;
   color: var(--wz-text-primary);
   display: -webkit-box;
@@ -342,7 +342,7 @@ function playText(n: number): string {
 
 .stat {
   font-family: ui-monospace, monospace;
-  font-size: 0.66rem;
+  font-size: 0.72rem;
   color: var(--wz-text-tertiary);
   opacity: 0.8;
 }

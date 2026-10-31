@@ -115,6 +115,10 @@ export function createCamera(cfg: CameraConfig): Engine {
       damping: CAMERA.PHYSICS_DAMPING,
       maxSpeed: CAMERA.PHYSICS_MAX_SPEED,
       anchorSaturation: CAMERA.PHYSICS_ANCHOR_SATURATION,
+      // 首尾之外仍然允许滑出去一段：区间外换成更软、阻尼更大的边界弹簧
+      bounds: { min: 0, max: last },
+      edgeStiffness: CAMERA.EDGE_STIFFNESS,
+      edgeDamping: CAMERA.EDGE_DAMPING,
     }
   }
 

@@ -26,10 +26,27 @@ describe('buildPath', () => {
     }
   })
 
-  it('把越界索引 clamp 到端点', () => {
+  it('越界索引沿端点切线外推（首尾要能滑出去一点）', () => {
     const path = buildPath(stops)
-    expect(path.sample(-5).x).toBeCloseTo(stops[0].x, 6)
-    expect(path.sample(99).x).toBeCloseTo(stops[stops.length - 1].x, 6)
+    // 端点本身仍然精确
+    expect(path.sample(0).x).toBeCloseTo(stops[0].x, 6)
+    expect(path.sample(path.last).x).toBeCloseTo(stops[stops.length - 1].x, 6)
+
+    // 越过端点后要真的动起来，而不是被 clamp 在原地 ——
+    // 否则物理上推得再远，画面也纹丝不动，观感就是「到边界直接截断」
+    expect(path.sample(-0.05).x).not.toBeCloseTo(stops[0].x, 4)
+    expect(path.sample(-0.05).y).not.toBeCloseTo(stops[0].y, 4)
+    expect(path.sample(path.last + 0.05).x).not.toBeCloseTo(
+      stops[stops.length - 1].x,
+      4,
+    )
+
+    // 外推方向与进入方向相反：负索引往「上一页的反方向」，
+    // 正索引往「下一页」继续走（这组测试锚点的 y 是负的，所以符号也相反）
+    expect(path.sample(-0.05).y).toBeGreaterThan(stops[0].y)
+    expect(path.sample(path.last + 0.05).y).toBeLessThan(
+      stops[stops.length - 1].y,
+    )
   })
 
   it('centripetal CR 几乎不过冲（真正的对照见 spatial-overshoot.test.ts）', () => {

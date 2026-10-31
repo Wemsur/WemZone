@@ -154,7 +154,7 @@ export function buildPath(stops: readonly Stop[]): CameraPath {
     }
   }
 
-  function sample(index: number): CameraPose {
+  function sampleClamped(index: number): CameraPose {
     const clamped = clamp(index, 0, last)
     const seg = clamp(Math.floor(clamped), 0, Math.max(0, last - 1))
     const u = clamped - seg
@@ -169,6 +169,47 @@ export function buildPath(stops: readonly Stop[]): CameraPath {
     const ry = a.ry + (b.ry - a.ry) * u
 
     return { x, y, d, rx, ry }
+  }
+
+  /**
+   * 端点切线（rem / 索引）。
+   *
+   * 用于区间**外**的线性外推：相机过冲到头尾时，画面要继续动一点点，
+   * 否则物理上再怎么推、`sample()` 都被 clamp 在端点上，看起来就是
+   * 「到边界直接截断」。
+   */
+  const EPS = 1e-3
+  const startPose = sampleClamped(0)
+  const startNext = sampleClamped(EPS)
+  const endPose = sampleClamped(last)
+  const endPrev = sampleClamped(last - EPS)
+  const startTangent = {
+    x: (startNext.x - startPose.x) / EPS,
+    y: (startNext.y - startPose.y) / EPS,
+  }
+  const endTangent = {
+    x: (endPose.x - endPrev.x) / EPS,
+    y: (endPose.y - endPrev.y) / EPS,
+  }
+
+  function sample(index: number): CameraPose {
+    if (index < 0) {
+      // 越过第一页：沿起点切线反向外推。标量（距离/倾角）保持端点值。
+      return {
+        ...startPose,
+        x: startPose.x + startTangent.x * index,
+        y: startPose.y + startTangent.y * index,
+      }
+    }
+    if (index > last) {
+      const k = index - last
+      return {
+        ...endPose,
+        x: endPose.x + endTangent.x * k,
+        y: endPose.y + endTangent.y * k,
+      }
+    }
+    return sampleClamped(index)
   }
 
   function centroid(): Vec3 {

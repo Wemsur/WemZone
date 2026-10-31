@@ -57,7 +57,7 @@ const LINKS = [
 
 .eyebrow {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.86rem;
   letter-spacing: 0.42em;
   text-indent: 0.42em;
   color: var(--wz-text-tertiary);
@@ -66,7 +66,7 @@ const LINKS = [
 
 .statement {
   margin: 0;
-  font-size: 1.6rem;
+  font-size: 2.3rem;
   font-weight: 500;
   letter-spacing: 0.06em;
   color: var(--wz-text-primary);
@@ -94,14 +94,14 @@ const LINKS = [
 }
 
 .label {
-  font-size: 1rem;
+  font-size: 1.2rem;
   letter-spacing: 0.08em;
   transition: color 200ms ease;
 }
 
 .hint {
   font-family: ui-monospace, monospace;
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   color: var(--wz-text-tertiary);
   opacity: 0.65;
 }

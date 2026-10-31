@@ -227,13 +227,13 @@ function go(index: number): void {
 
 .name {
   font-family: 'XuanZong', serif;
-  font-size: 1.35rem;
+  font-size: 1.5rem;
   line-height: 1;
   letter-spacing: 0.04em;
 }
 
 .wordmark {
-  height: 0.72rem;
+  height: 0.85rem;
   width: auto;
   color: var(--wz-brand-soft);
   transform: translateY(0.04rem);
@@ -267,8 +267,8 @@ function go(index: number): void {
 }
 
 .icon svg {
-  width: 1.15rem;
-  height: 1.15rem;
+  width: 1.3rem;
+  height: 1.3rem;
 }
 
 .menu-btn {
@@ -301,7 +301,7 @@ function go(index: number): void {
   border-radius: 0.45rem;
   background: transparent;
   color: var(--wz-text-tertiary);
-  font-size: 0.86rem;
+  font-size: 0.95rem;
   text-align: left;
   cursor: pointer;
   transition:

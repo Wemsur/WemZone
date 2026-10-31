@@ -71,6 +71,15 @@ export interface PhysicsParams {
    * 不传则退化成线性锚定（旧行为）。
    */
   anchorSaturation?: number
+  /**
+   * 合法区间。越界后不再使用周期势能与井锚定，改用一个**更软但更强阻尼**
+   * 的边界弹簧 —— 用户要求「到头尾还能滑一点，但单独加大最上/最下的阻尼」。
+   */
+  bounds?: { min: number; max: number }
+  /** 边界弹簧刚度（索引/秒² per 索引）。比内部小，允许滑得更远。 */
+  edgeStiffness?: number
+  /** 边界阻尼（比内部大：滑出去能很快回来，不来回荡）。 */
+  edgeDamping?: number
 }
 
 /** 势能对 s 的负导数，也就是相机受到的「引力」。 */
@@ -113,13 +122,28 @@ export function advance(
   //  - 远处（|d| ≫ sat）→ 力封顶在 k·sat，起步不会被猛推。
   //
   // 附带的好处是它更像真实的引力：距离越远力越大，但有上限。
-  const d = anchor - state.s
-  const sat = p.anchorSaturation
-  const anchorForce =
-    sat && sat > 0 ? p.k * sat * Math.tanh(d / sat) : p.k * d
+  // 判断是否越界。越界时势能与井锚定都**失效** —— 周期势在区间外会试图
+  // 把相机拉向一个不存在的「上一页/下一页」，那显然不对。
+  const b = p.bounds
+  const edge = b ? (state.s < b.min ? b.min : state.s > b.max ? b.max : null) : null
 
-  const a =
-    potentialForce(state.s, p.k) - p.damping * state.v + anchorForce + inputForce
+  let potential = 0
+  let restoring = 0
+  let damp = p.damping
+
+  if (edge === null) {
+    const d = anchor - state.s
+    const sat = p.anchorSaturation
+    potential = potentialForce(state.s, p.k)
+    restoring = sat && sat > 0 ? p.k * sat * Math.tanh(d / sat) : p.k * d
+  } else {
+    // 边界外：只有一个更软、阻尼更大的弹簧把人拉回去。
+    // 软 → 允许滑出去一段；阻尼大 → 松手后干脆地回来，不晃。
+    restoring = (p.edgeStiffness ?? p.k) * (edge - state.s)
+    damp = p.edgeDamping ?? p.damping
+  }
+
+  const a = potential - damp * state.v + restoring + inputForce
 
   // 先更新速度
   let v = state.v + a * dtSec
