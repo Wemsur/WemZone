@@ -157,7 +157,10 @@ onBeforeUnmount(() => {
               >
                 <!-- 该区块自己的背景：在 3D 世界里跟着区块一起移动。
                      尺寸比区块大，相邻区块的背景在区块之间重叠并交叉渐隐。 -->
-                <div class="section-bg" aria-hidden="true">
+                <div
+                  :class="['section-bg', { 'section-bg--last': i === ACTIVE_SECTIONS.length - 1 }]"
+                  aria-hidden="true"
+                >
                   <Background :kind="section.background" :hue="section.hue ?? 18" />
                 </div>
 

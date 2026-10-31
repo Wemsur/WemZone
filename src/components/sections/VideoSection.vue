@@ -32,7 +32,9 @@ const camera = useCamera()
 
 const videos = ref<VideoItem[]>((snapshot as { videos: VideoItem[] }).videos)
 
-const COPY_COUNT = 3
+// 一份内容就有约 10000px（30 张 23rem 的卡片），两份足够无缝循环，
+// 第三份只会白白增加 120 个 DOM 节点。
+const COPY_COUNT = 2
 const BASE_SPEED = 26
 const DECEL_TAU = 0.34
 
@@ -43,6 +45,30 @@ const copyEl = ref<HTMLElement | null>(null)
 const rowList = [0, 1, 2, 3]
 
 const latestBvid = computed(() => videos.value[0]?.bvid ?? '')
+
+/**
+ * 每行一份**独立打乱**的顺序。
+ *
+ * 四行如果共用同一份顺序，斜着看会形成同一条重复的斜线，很假。
+ * 用确定性洗牌（同一次加载内稳定），行与行之间互补重复。
+ */
+function shuffle<T>(input: readonly T[], seed: number): T[] {
+  const a = [...input]
+  let s = seed >>> 0
+  const rnd = (): number => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0
+    return s / 4294967296
+  }
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1))
+    const t = a[i]
+    a[i] = a[j]
+    a[j] = t
+  }
+  return a
+}
+
+const rowData = computed(() => rowList.map((r) => shuffle(videos.value, 1337 + r * 97)))
 
 const pos = [0, 0, 0, 0]
 const speed = [BASE_SPEED, BASE_SPEED, BASE_SPEED, BASE_SPEED]
@@ -169,7 +195,9 @@ function playText(n: number): string {
       </p>
     </header>
 
-    <div ref="grid" class="grid">
+    <!-- 卡片在视野边缘渐隐，而不是被区域边界硬切 -->
+    <div class="stage-mask">
+      <div ref="grid" class="grid">
       <div
         v-for="r in rowList"
         :key="r"
@@ -185,7 +213,7 @@ function playText(n: number): string {
             class="copy"
           >
             <a
-              v-for="(v, i) in videos"
+              v-for="(v, i) in rowData[r]"
               :key="`${r}-${c}-${i}-${v.bvid}`"
               class="vcard"
               :class="{ latest: v.bvid === latestBvid }"
@@ -212,7 +240,13 @@ function playText(n: number): string {
           </div>
         </div>
       </div>
+
+      </div>
     </div>
+
+    <!-- 左上角渐变遮罩：文字压在卡片上时保证可读。
+         从左上角 50% 不透明度渐隐到画面中心 0%。 -->
+    <div class="corner-scrim" aria-hidden="true" />
   </div>
 </template>
 
@@ -236,7 +270,7 @@ function playText(n: number): string {
 
 .title {
   margin: 0;
-  font-size: 1.9rem;
+  font-size: 2.7rem;
   font-weight: 600;
   letter-spacing: 0.12em;
   color: var(--wz-text-primary);
@@ -245,7 +279,7 @@ function playText(n: number): string {
 
 .lead {
   margin: 0.55rem 0 0;
-  font-size: 1rem;
+  font-size: 1.18rem;
   line-height: 1.75;
   letter-spacing: 0.03em;
   color: var(--wz-text-tertiary);
@@ -265,6 +299,27 @@ function playText(n: number): string {
   justify-content: center;
   gap: 1.35rem;
   will-change: transform, opacity;
+}
+
+/* 视野边缘渐隐：mask 必须在**屏幕对齐**的容器上。
+   加在 .grid 上会跟着 30° 旋转，而且它是 190% 大小，
+   渐隐区会跑到视口外，等于没做。 */
+.stage-mask {
+  position: absolute;
+  inset: 0;
+  mask-image: radial-gradient(ellipse 78% 82% at 50% 50%, #000 58%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 78% 82% at 50% 50%, #000 58%, transparent 100%);
+}
+
+/* 左上角的暗色雾：把卡片压暗，给标题让出可读区。
+   注意这是**遮罩（scrim）**，不是 alpha mask —— 卡片不该消失，
+   只是变暗；从左上 50% 不透明度平滑过渡到画面中心 0%。 */
+.corner-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(circle at 0% 0%, rgb(9 9 11 / 0.5) 0%, rgb(9 9 11 / 0) 58%);
 }
 
 .row {

@@ -233,11 +233,20 @@ body {
 
    尺寸远大于区块（160% × 185%），于是：
    - 区块居中时视野里看不到背景边缘，不会出现黑边；
-   - 相邻区块的背景在区块之间重叠（区块间距 72rem，背景半高 54rem），
-     两条 mask 的渐隐区在重叠处互补，形成空间上的交叉淡入而不是硬切。
+   - 相邻区块的背景在区块之间重叠（区块间距 72rem，背景半高 54rem）。
 
-   竖直方向的渐隐长度按互补关系算：半高 54rem、间距 72rem →
-   渐隐长度 = 2×54 − 72 = 36rem = 108rem 的 33.3%。 */
+   ## 竖直渐隐是**不对称**的：只在顶边渐隐
+
+   区块背景按 DOM 顺序叠放，索引大的画在上面。所以：
+   - 下一区的背景从它自己的顶边淡入（0 → 1，跨 36rem），盖在上一区
+     **不透明**的下半部分上；
+   - 两区的重叠区正好以「中点」为中心，在中点处 50% / 50% 混合。
+
+   如果两边都渐隐（对称 mask），半透明叠半透明会漏出底色，转场中间
+   发黑 —— 这正是用户说的「两区域之间是单调的黑」。
+
+   背景半高 54rem、间距 72rem → 重叠 36rem；渐隐长度取 36rem，
+   即 108rem 的 33.33%，正好让上一区的下边缘保持不透明。 */
 .section-bg {
   position: absolute;
   left: 50%;
@@ -247,13 +256,23 @@ body {
   transform: translate(-50%, -50%);
   pointer-events: none;
   mask-image:
+    linear-gradient(to bottom, transparent 0%, #000 33.33%, #000 100%),
+    linear-gradient(to right, transparent 0%, #000 18%, #000 82%, transparent 100%);
+  -webkit-mask-image:
+    linear-gradient(to bottom, transparent 0%, #000 33.33%, #000 100%),
+    linear-gradient(to right, transparent 0%, #000 18%, #000 82%, transparent 100%);
+  mask-composite: intersect;
+  -webkit-mask-composite: source-in;
+}
+
+/* 最后一个区块没有「下一区」可以盖住它的底边，所以单独在底边渐隐 */
+.section-bg--last {
+  mask-image:
     linear-gradient(to bottom, transparent 0%, #000 33.33%, #000 66.67%, transparent 100%),
     linear-gradient(to right, transparent 0%, #000 18%, #000 82%, transparent 100%);
   -webkit-mask-image:
     linear-gradient(to bottom, transparent 0%, #000 33.33%, #000 66.67%, transparent 100%),
     linear-gradient(to right, transparent 0%, #000 18%, #000 82%, transparent 100%);
-  mask-composite: intersect;
-  -webkit-mask-composite: source-in;
 }
 
 /* 内容层：压在背景之上 */
