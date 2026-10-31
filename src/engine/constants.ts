@@ -19,9 +19,9 @@ export const CAMERA = {
    * **必须是正值**：CSS 里 +Y 是向下，所以正值让索引更大的区块落在更低处，
    * 「向下滚动 = 去下一页」才和普通网页一致。负值会把后面的区块摆到上方。
    */
-  VERTICAL_SPACING: 72,
+  VERTICAL_SPACING: 102,
   /** 左右交替的横向振幅（rem） */
-  LATERAL_AMPLITUDE: 26,
+  LATERAL_AMPLITUDE: 37,
   /** 基准相机距离（rem）。所有区块共用这个距离。 */
   BASE_DISTANCE: 34,
   /**
@@ -155,7 +155,7 @@ export const CAMERA = {
 
   /* ---- 动态倾斜 ---- */
   /** 速度 → 倾斜角的增益（deg per rem/ms） */
-  TILT_VEL_GAIN: 37,
+  TILT_VEL_GAIN: 12,
   /** 动态倾斜封顶（deg） */
   TILT_MAX_DEG: 15,
 

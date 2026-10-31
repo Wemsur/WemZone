@@ -247,7 +247,7 @@ body {
 
    尺寸远大于区块（170% × 200%），于是：
    - 区块居中时视野里看不到背景边缘，不会出现黑边；
-   - 相邻区块的背景在区块之间重叠（区块间距 72rem，背景半高 65rem）。 */
+   - 相邻区块的背景在区块之间重叠（区块间距默认 102rem，背景半高 65rem 起）。 */
 .section-bg {
   position: absolute;
   left: 50%;
@@ -256,20 +256,19 @@ body {
   height: 200%;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  /* 尺寸 200%：区块间距 72rem，背景半高 65rem（@1440×900），相邻背景重叠 58rem。
+  /* 尺寸 200%：间距 102rem 时半高不够，World.vue 会把高度按几何加高（约 218%）。
 
      **竖直渐隐由 World.vue 按真实几何写成内联样式**（见 lib/bgMask.ts）：
-     渐隐带以两区中点为中心，不伸进视野、也不越过背景自己的边。下面的
-     mask 只是「探针量出视口尺寸之前」的首帧兜底，取 1440×900 下算出的
-     数值（约 19%–26% / 74%–81%）。 */
+     渐隐带从本区视野边缘一直铺到下一区上边缘。下面的 mask 只是
+     「探针量出视口尺寸之前」的首帧兜底（取 1440×900、间距 102rem），
+     正常渲染时由 World.vue 内联覆盖（含高度）。 */
   mask-image:
     linear-gradient(
       to bottom,
       transparent 0%,
-      transparent 18.65%,
-      #000 25.96%,
-      #000 74.04%,
-      transparent 81.35%,
+      #000 27.92%,
+      #000 72.08%,
+      transparent 100%,
       transparent 100%
     ),
     linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
@@ -277,10 +276,9 @@ body {
     linear-gradient(
       to bottom,
       transparent 0%,
-      transparent 18.65%,
-      #000 25.96%,
-      #000 74.04%,
-      transparent 81.35%,
+      #000 27.92%,
+      #000 72.08%,
+      transparent 100%,
       transparent 100%
     ),
     linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
@@ -291,7 +289,7 @@ body {
 /* 首尾区块使用同一套对称渐隐：两端都淡出，世界最上和最下也不会硬切 */
 
 @media (max-width: 900px) and (orientation: portrait) {
-  /* 窄版一节就是整屏（约 52rem），比宽版的 72rem 间距紧凑得多。
+  /* 窄版一节就是整屏（约 52rem），比宽版的 102rem 间距紧凑得多。
      背景若仍按 200% 高，相邻背景会从**本屏中间**就开始叠上来，
      整屏看起来像「下一区的颜色从屏幕中线升起」。
      收到 150%：相邻背景的顶边落到本屏下方四分之一处，重叠仍够融合，

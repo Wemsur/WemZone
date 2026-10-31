@@ -1,13 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 import Wordmark from '@/assets/wemzone-wordmark.svg?component'
+import SensitivityBar from '@/components/SensitivityBar.vue'
 import { useCamera, useCameraFrame } from '@/composables/useCamera'
-import {
-  SENSITIVITY_MAX,
-  SENSITIVITY_MIN,
-  scrollSensitivity,
-} from '@/lib/preferences'
 import { ACTIVE_SECTIONS } from '@/sections'
 
 /**
@@ -31,6 +27,8 @@ import { ACTIVE_SECTIONS } from '@/sections'
 const camera = useCamera()
 
 const card = ref<HTMLElement | null>(null)
+/** 卡片在下半屏时灵敏度条翻到上方（tooltip 也跟着翻） */
+const flipped = ref(false)
 
 /** 卡片尺寸：定位时要用，缓存下来避免每帧读布局 */
 const size = { w: 176, h: 120 }
@@ -113,17 +111,10 @@ useCameraFrame((frame) => {
   const blur = clamp(Math.abs(frame.velocity) * 0.9, 0, 2)
   el.style.filter = blur > 0.15 ? `blur(${blur.toFixed(2)}px)` : ''
 
-  // 卡片跑到下半屏时，灵敏度面板翻到卡片**上方** —— 否则会顶出视口底边
-  el.classList.toggle('flip', p.y > window.innerHeight * 0.5)
-})
-
-const sensitivityLabel = computed(() => String(Math.round(scrollSensitivity.value * 100) / 100))
-
-/** 填充比例：0.4× → 0%，2.5× → 100% */
-const sensitivityPct = computed(() => {
-  const t =
-    (scrollSensitivity.value - SENSITIVITY_MIN) / (SENSITIVITY_MAX - SENSITIVITY_MIN)
-  return (clamp(t, 0, 1) * 100).toFixed(1)
+  // 卡片跑到下半屏时，灵敏度条翻到卡片**上方** —— 否则会顶出视口底边
+  const flip = p.y > window.innerHeight * 0.5
+  el.classList.toggle('flip', flip)
+  if (flipped.value !== flip) flipped.value = flip
 })
 
 onMounted(() => {
@@ -153,7 +144,7 @@ onBeforeUnmount(() => {
         role="tab"
         :aria-selected="camera.current.value === i"
         :aria-label="section.label"
-        @click="camera.goTo(i)"
+        @click="camera.goTo(i, { immediate: true })"
       />
     </div>
 
@@ -215,30 +206,10 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- 滑动灵敏度：与卡片等宽的扁条。
-         外层是卡片，中间那圈「像边框一样的圆角矩形」是轨道，
-         橙色从左边按当前倍率填充；不放任何文字，数值走 tooltip。 -->
+    <!-- 滑动灵敏度：与卡片等宽的扁条（组件本身见 SensitivityBar.vue）。
+         悬停整张卡片时滑出；卡片在下半屏时翻到上方。 -->
     <div class="sensitivity">
-      <div class="sens-panel" @wheel.stop>
-        <div class="sens-track">
-          <div class="sens-fill" :style="{ width: `${sensitivityPct}%` }" />
-        </div>
-
-        <!-- 真正的控件：透明覆盖整块，可拖动、可键盘操作 -->
-        <input
-          v-model.number="scrollSensitivity"
-          class="sens-range"
-          type="range"
-          :min="SENSITIVITY_MIN"
-          :max="SENSITIVITY_MAX"
-          step="0.05"
-          aria-label="滑动灵敏度"
-        />
-
-        <span class="sens-tip" role="tooltip">
-          滑动灵敏度：{{ sensitivityLabel }}×
-        </span>
-      </div>
+      <SensitivityBar :flip="flipped" />
     </div>
   </aside>
 </template>
@@ -385,89 +356,4 @@ onBeforeUnmount(() => {
   pointer-events: auto;
 }
 
-/* 外层卡片：四边等距的 padding 让内层看起来像被一圈边框包住 */
-.sens-panel {
-  position: relative;
-  padding: 0.3rem;
-  border-radius: 0.8rem;
-  background: color-mix(in srgb, #101010 55%, transparent);
-  backdrop-filter: blur(0.9rem) saturate(1.1);
-  box-shadow: 0 0.6rem 2rem rgb(0 0 0 / 0.32);
-  transition: box-shadow 180ms ease;
-}
-
-.sens-panel:focus-within {
-  box-shadow:
-    0 0.6rem 2rem rgb(0 0 0 / 0.32),
-    0 0 0 1px color-mix(in srgb, var(--wz-brand-soft) 55%, transparent);
-}
-
-/* 轨道：就是那圈「像边框一样」的圆角矩形，橙色在它内部从左往右填 */
-.sens-track {
-  position: relative;
-  height: 0.95rem;
-  border-radius: 0.5rem;
-  background: rgb(255 255 255 / 0.05);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
-  overflow: hidden;
-}
-
-.sens-fill {
-  height: 100%;
-  border-radius: 0.5rem;
-  background: linear-gradient(90deg, var(--wz-brand), var(--wz-brand-soft));
-  box-shadow: 0 0 0.6rem hsl(var(--wz-brand-hue) 68% 55% / 0.45);
-  transition: width 160ms ease;
-}
-
-/* 真正的控件：透明地铺满整块面板，拖动 / 点击 / 键盘都在它上面 */
-.sens-range {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-
-/* tooltip：默认在扁条下方（扁条在卡片下方），翻到卡片上方时改到扁条上方 */
-.sens-tip {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 0.4rem);
-  padding: 0.28rem 0.5rem;
-  border: 1px solid rgb(255 255 255 / 0.08);
-  border-radius: 0.42rem;
-  background: color-mix(in srgb, #0d0d0d 88%, transparent);
-  backdrop-filter: blur(0.5rem);
-  font-size: 0.68rem;
-  line-height: 1.3;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  color: var(--wz-text-primary);
-  opacity: 0;
-  transform: translateY(-0.15rem);
-  pointer-events: none;
-  transition:
-    opacity 150ms ease,
-    transform 150ms ease;
-}
-
-.sens-panel:hover .sens-tip,
-.sens-panel:focus-within .sens-tip {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.unified-card.flip .sens-tip {
-  top: auto;
-  bottom: calc(100% + 0.4rem);
-  transform: translateY(0.15rem);
-}
-
-.unified-card.flip .sens-panel:hover .sens-tip,
-.unified-card.flip .sens-panel:focus-within .sens-tip {
-  transform: translateY(0);
-}
 </style>

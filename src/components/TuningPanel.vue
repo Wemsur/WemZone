@@ -111,7 +111,7 @@ const GROUPS: { title: string; knobs: Knob[] }[] = [
  * localStorage 里，把「距离恒定」的修复完全盖掉了，转场继续先缩后放。
  * 升版本等于让旧存档失效，用户从新默认值开始。
  */
-const STORAGE_KEY = 'wemzone.tuning.v3'
+const STORAGE_KEY = 'wemzone.tuning.v4'
 
 /** 当前值与默认值的快照。默认值在模块加载时抓一次，用于「恢复默认」。 */
 const DEFAULTS: Record<string, number> = {}

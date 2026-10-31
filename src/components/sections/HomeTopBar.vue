@@ -2,6 +2,7 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 import Wordmark from '@/assets/wemzone-wordmark.svg?component'
+import SensitivityBar from '@/components/SensitivityBar.vue'
 import { useCamera, useCameraFrame } from '@/composables/useCamera'
 import { ACTIVE_SECTIONS } from '@/sections'
 
@@ -60,9 +61,13 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKey)
 })
 
+/**
+ * 导航一律**瞬间**跳过去，不走相机轨迹。
+ * 用户要求：点导航是「去那一页」，不是「看一次转场」。
+ */
 function go(index: number): void {
   menuOpen.value = false
-  camera.goTo(index)
+  camera.goTo(index, { immediate: true })
 }
 </script>
 
@@ -139,23 +144,30 @@ function go(index: number): void {
           </svg>
         </a>
 
-        <button
-          class="icon menu-btn"
-          type="button"
-          :aria-expanded="menuOpen"
-          aria-label="导航"
-          @click="menuOpen = !menuOpen"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M4 7h16M4 12h16M4 17h16"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.7"
-              stroke-linecap="round"
-            />
-          </svg>
-        </button>
+        <!-- 三个横杠 + 悬停时从下方滑出的滑动灵敏度条 -->
+        <div class="menu-wrap">
+          <button
+            class="icon menu-btn"
+            type="button"
+            :aria-expanded="menuOpen"
+            aria-label="导航"
+            @click="menuOpen = !menuOpen"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M4 7h16M4 12h16M4 17h16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
+
+          <div class="topbar-sens">
+            <SensitivityBar />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -273,6 +285,35 @@ function go(index: number): void {
 
 .menu-btn {
   padding: 0;
+}
+
+/* --- 三个横杠 + 灵敏度条 --- */
+.menu-wrap {
+  position: relative;
+  display: flex;
+}
+
+/* 与统一卡片同一套交互：悬停按钮时从下方滑出；padding 而不是 margin，
+   让「按钮 → 条」之间的空隙也算在悬停区域内。 */
+.topbar-sens {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  width: 11rem;
+  padding-top: 0.45rem;
+  opacity: 0;
+  transform: translateY(-0.3rem);
+  pointer-events: none;
+  transition:
+    opacity 180ms ease,
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.menu-wrap:hover .topbar-sens,
+.menu-wrap:focus-within .topbar-sens {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .menu {

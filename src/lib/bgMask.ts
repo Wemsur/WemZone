@@ -28,7 +28,11 @@
 export interface BgMaskOptions {
   /** 区块在世界里的高度（rem），即一屏 × 出血系数 */
   sectionH: number
-  /** 背景高度相对区块的倍率。**必须与 main.css 里 .section-bg 的 height 一致。** */
+  /**
+   * 背景高度的**最小**倍率（相对区块）。
+   * 宽版 2（与 main.css 一致）、窄版 1.5。间距很大时会自动加高，
+   * 保证淡出带能走到下一区的上边缘而不被背景自己的边截断。
+   */
   bgFactor: number
   /** 相邻区块的世界间距（rem） */
   spacing: number
@@ -42,17 +46,27 @@ export interface BgMaskOptions {
 /** 淡出带的最小宽度（rem）——再窄就和硬边没区别了 */
 const MIN_BAND = 1.6
 
-export function sectionBgMask(opts: BgMaskOptions): string {
+export interface BgMaskResult {
+  /** 竖直 + 横向两条渐变的 mask（两块用 intersect 合成） */
+  mask: string
+  /** 背景高度，相对区块的百分比（写进 .section-bg 的 height） */
+  heightPct: number
+}
+
+export function sectionBgMask(opts: BgMaskOptions): BgMaskResult {
   const { sectionH, bgFactor, spacing } = opts
   const bleed = opts.bleed ?? 1.04
-  const bgH = sectionH * bgFactor
-  const bgHalf = bgH / 2
   const visibleHalf = sectionH / bleed / 2
 
   // 内侧边界：正好在视野边缘（视野内永远不透明）
-  const inner = Math.max(0, Math.min(bgHalf - MIN_BAND, visibleHalf))
+  const inner = Math.max(0, visibleHalf)
   // 外侧边界：正好在下一区的视野边缘 —— 整段间隙都是渐变
-  const outer = Math.min(bgHalf, Math.max(inner + MIN_BAND, spacing - visibleHalf))
+  const outer = Math.max(inner + MIN_BAND, spacing - visibleHalf)
+
+  // 背景必须够高：至少到外侧边界，否则淡出带会被自己的边截断。
+  // 间距调大时背景随之加高（默认 200% 只是下限）。
+  const bgHalf = Math.max((sectionH * bgFactor) / 2, outer)
+  const bgH = bgHalf * 2
 
   /** rem（距背景顶边）→ 百分比 */
   const pct = (rem: number): string =>
@@ -63,9 +77,11 @@ export function sectionBgMask(opts: BgMaskOptions): string {
   const botInner = pct(bgHalf + inner)
   const botOuter = pct(bgHalf + outer)
 
-  return (
-    `linear-gradient(to bottom, transparent 0%, transparent ${topOuter}, ` +
-    `#000 ${topInner}, #000 ${botInner}, transparent ${botOuter}, transparent 100%), ` +
-    `linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%)`
-  )
+  return {
+    mask:
+      `linear-gradient(to bottom, transparent 0%, transparent ${topOuter}, ` +
+      `#000 ${topInner}, #000 ${botInner}, transparent ${botOuter}, transparent 100%), ` +
+      `linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%)`,
+    heightPct: (bgH / sectionH) * 100,
+  }
 }

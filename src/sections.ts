@@ -19,6 +19,8 @@ export interface SectionDef {
   id: string
   /** 导航与章节轴上显示的名字 */
   label: string
+  /** 页脚导航用的短名（不填则用 label） */
+  short?: string
   /** 该区的品牌色相（deg）。不填则用全局 --brand-hue。 */
   hue?: number
   /** 该区的背景场景（见 BackgroundKind） */
@@ -29,17 +31,17 @@ export interface SectionDef {
 
 export const SECTIONS: SectionDef[] = [
   // 首页：背景图 + 遮罩 + 白色呼吸光晕 + 微弱点阵
-  { id: 'home', label: '首页', hue: 18, background: 'home', enabled: true },
+  { id: 'home', label: '首页', short: '首页', hue: 18, background: 'home', enabled: true },
   // 启动器：流体 + 流动像素（呼应其官网）
-  { id: 'launcher', label: 'Celestial Launcher', hue: 38, background: 'launcher', enabled: true },
+  { id: 'launcher', label: 'Celestial Launcher', short: '启动器', hue: 38, background: 'launcher', enabled: true },
   // 其它作品：点阵 + 均匀起伏的波形 + 光晕
-  { id: 'works', label: '其它作品', hue: 210, background: 'works', enabled: true },
+  { id: 'works', label: '其它作品', short: '作品', hue: 210, background: 'works', enabled: true },
   // 视频：呼吸光晕 + 流动像素 + 背景图 + 边缘渐隐
-  { id: 'video', label: '视频', hue: 340, background: 'video', enabled: true },
+  { id: 'video', label: '视频', short: '视频', hue: 340, background: 'video', enabled: true },
   // 预留：以后做 Minecraft 玩家页（3D 模型 + 档案信息）。上线时不出现。
   { id: 'minecraft', label: 'Minecraft 玩家', background: 'contact', enabled: false },
   // 联系：最安静的一屏，几乎只有渐变
-  { id: 'contact', label: '联系', hue: 160, background: 'contact', enabled: true },
+  { id: 'contact', label: '联系', short: '联系', hue: 160, background: 'contact', enabled: true },
 ]
 
 /** 当前启用的区块。相机与导航都只认这个。 */

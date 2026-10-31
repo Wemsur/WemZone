@@ -40,13 +40,22 @@ let cleanup: (() => void) | null = null
  *
  * 背景高度在窄版是 150%（见 main.css），所以 bgFactor 取 1.5。
  */
-const bgMask = ref('')
+const bgStyle = ref<Record<string, string>>({})
 
 function updateBgMask(): void {
   const root = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
   const sectionH = window.innerHeight / root
-  const mask = sectionBgMask({ sectionH, bgFactor: 1.5, spacing: sectionH, bleed: 1 })
-  bgMask.value = mask
+  const { mask, heightPct } = sectionBgMask({
+    sectionH,
+    bgFactor: 1.5,
+    spacing: sectionH,
+    bleed: 1,
+  })
+  bgStyle.value = {
+    'mask-image': mask,
+    '-webkit-mask-image': mask,
+    height: `${heightPct.toFixed(2)}%`,
+  }
 }
 
 /**
@@ -116,7 +125,7 @@ function go(i: number): void {
   const el = root.value
   if (!el) return
   const sec = el.querySelectorAll<HTMLElement>('[data-mobile-section]')[i]
-  sec?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  sec?.scrollIntoView({ behavior: 'auto', block: 'start' })
 }
 
 /** 内容自身的轻微位移 + 缩放：越靠近视口中心越「正」。 */
@@ -143,7 +152,7 @@ function sectionStyle(i: number): Record<string, string> {
       <!-- 背景跟着这一节滚动，与宽版同一套场景组件 -->
       <div
                   :class="['section-bg', { 'section-bg--last': i === ACTIVE_SECTIONS.length - 1 }]"
-                  :style="{ 'mask-image': bgMask, '-webkit-mask-image': bgMask }"
+                  :style="bgStyle"
                   aria-hidden="true"
                 >
         <Background :kind="section.background" :hue="section.hue ?? 18" />

@@ -319,10 +319,21 @@ export function createCamera(cfg: CameraConfig): Engine {
         break
       }
       case 'jump': {
-        setAnchor(intent.index)
+        // 导航类跳转（Home/End、全览点击）一律**瞬间**到位，不走转场
+        snapTo(intent.index)
         break
       }
     }
+  }
+
+  /** 瞬间落到某个井：直接改状态，不经过物理。导航跳转用。 */
+  function snapTo(target: number): void {
+    anchor = clamp(Math.round(target), 0, last)
+    phys = { s: anchor, v: 0 }
+    velocity = 0
+    inputForce = 0
+    notifySettle(anchor)
+    emitFrame()
   }
 
   /** 设置目标井。物理负责走过去 —— 没有补间、没有缓动曲线。 */
@@ -387,14 +398,9 @@ export function createCamera(cfg: CameraConfig): Engine {
 
     goTo(index, opts): void {
       if (opts?.immediate) {
-        anchor = clamp(Math.round(index), 0, last)
-        phys = { s: anchor, v: 0 }
-        velocity = 0
-        inputForce = 0
         // 立即定位也要通知落位订阅者 —— 否则 Vue 侧的 current ref 与 URL hash
         // 都不会跟着更新（深链接刷新后 HUD 与地址栏会停在旧值）。
-        notifySettle(anchor)
-        emitFrame()
+        snapTo(index)
         return
       }
       setAnchor(index)

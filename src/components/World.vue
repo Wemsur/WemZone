@@ -128,9 +128,13 @@ function bgMaskStyle(index: number): Record<string, string> {
         : prev
           ? stops[index].y - prev.y
           : sectionH
-  const mask = sectionBgMask({ sectionH, bgFactor: BG_FACTOR, spacing })
+  const { mask, heightPct } = sectionBgMask({ sectionH, bgFactor: BG_FACTOR, spacing })
   // 用连字符键：Vue 会对它们走 setProperty，`-webkit-` 前缀才会被原样保留
-  return { 'mask-image': mask, '-webkit-mask-image': mask }
+  return {
+    'mask-image': mask,
+    '-webkit-mask-image': mask,
+    height: `${heightPct.toFixed(2)}%`,
+  }
 }
 
 function measureViewport(): void {
