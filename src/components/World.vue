@@ -2,10 +2,12 @@
 import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 
 import Background from '@/components/Background.vue'
+import OverviewLayer from '@/components/OverviewLayer.vue'
 import { useCamera } from '@/composables/useCamera'
 import { applyBlur, clearBlur, type BlurMode, type BlurTargets } from '@/engine/blur'
 import { CAMERA } from '@/engine/constants'
 import { staticSectionTransform } from '@/engine/world'
+import { overviewOn } from '@/lib/overview'
 import { ACTIVE_SECTIONS } from '@/sections'
 
 /**
@@ -31,6 +33,9 @@ const worldEl = ref<HTMLElement | null>(null)
 const layerEl = ref<HTMLElement | null>(null)
 const feBlurEl = ref<SVGFEGaussianBlurElement | null>(null)
 
+/** 总览层只在开发时挂载（它读引擎内部路径、画调试轨迹） */
+const isDev = import.meta.env.DEV
+
 let detach: (() => void) | null = null
 let stopFrame: (() => void) | null = null
 
@@ -46,6 +51,11 @@ onMounted(() => {
 
   // 订阅每帧状态，命令式写 DOM —— 不进 Vue 响应式（见 docs/DESIGN.md 第八节）
   stopFrame = camera.engine.subscribe((frame) => {
+    // 总览是看地图，不是运动：不要把它糊掉
+    if (overviewOn.value) {
+      clearBlur(targets)
+      return
+    }
     applyBlur(targets, frame, props.blurMode)
   })
 })
@@ -68,7 +78,9 @@ function sectionStyle(index: number): Record<string, string> {
   // 读取版本号建立响应式依赖（值本身不参与计算）。
   void camera.geometryVersion.value
   const stop = camera.engine.path.stops[index]
-  return { transform: staticSectionTransform(stop, CAMERA.PERSPECTIVE) }
+  // 总览时关掉距离补偿：镜头在很远处，按 d_i/P 补偿会让区块缩成小点、
+  // 间距却不变，看到的就不是「整个平面」了。见 OverviewLayer.vue。
+  return { transform: staticSectionTransform(stop, CAMERA.PERSPECTIVE, !overviewOn.value) }
 }
 
 /**
@@ -168,6 +180,9 @@ onBeforeUnmount(() => {
                   <slot :name="section.id" :index="i" />
                 </div>
               </section>
+
+              <!-- 开发用总览：轨迹与停靠点画在世界坐标里，跟着 3D 场景一起投影 -->
+              <OverviewLayer v-if="isDev" />
             </div>
           </div>
         </div>

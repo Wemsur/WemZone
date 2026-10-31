@@ -93,9 +93,14 @@ export function renderPose(world: HTMLElement, pose: CameraPose, P: number): voi
  * `transform-origin` 必须是 `0 0`，且 `translate(-50%, -50%)` 放在最内层 ——
  * 这样 (x, y) 指的是**内容块的中心**，且缩放发生在中心。
  * 详见本文件顶部「距离变、大小不变」。
+ *
+ * @param compensate `false` 时不带距离补偿（scale = 1）。总览模式用：
+ *   镜头在很远处，若仍按 `d_i / P` 补偿，区块会缩成小点、间距却不变，
+ *   看到的不是「整个平面」而是一串孤立的小块。关掉补偿后世界尺寸就是
+ *   设计尺寸（一屏 × 5 个区块），拉远后整张地图才是等比例的。
  */
-export function staticSectionTransform(stop: Stop, P: number): string {
-  const s = stop.d / P
+export function staticSectionTransform(stop: Stop, P: number, compensate = true): string {
+  const s = compensate ? stop.d / P : 1
   return (
     `translate3d(${round(stop.x)}rem, ${round(stop.y)}rem, 0) ` +
     `scale(${round(s, 6)}) translate(-50%, -50%)`

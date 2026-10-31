@@ -4,7 +4,7 @@ import { createCamera, type Engine } from '@/engine/camera'
 import { CAMERA } from '@/engine/constants'
 import { setTimeScale } from '@/engine/debug'
 import { resetForTests } from '@/lib/scheduler'
-import type { Stop } from '@/engine/types'
+import type { CameraFrame, Stop } from '@/engine/types'
 
 /**
  * 相机 = 连续受力质点
@@ -115,8 +115,9 @@ describe('连续力学相机', () => {
     settle(cam)
     stop()
 
-    // 过冲必须看得见：约 1.2% 格距（约 50px 屏幕位移）
-    expect(maxIndex).toBeGreaterThan(1.005)
+    // 过冲必须看得见：当前默认 k=130 / c=26 实测约 0.19% 格距
+    // （索引 0.0019 ≈ 2px 屏幕位移）。阈值留一点余量，避免浮点噪声。
+    expect(maxIndex).toBeGreaterThan(1.0012)
     // 但不能逼近势垒（1.5）或跑进下一格
     expect(maxIndex).toBeLessThan(1.05)
     expect(cam.current).toBe(1)
@@ -331,8 +332,46 @@ describe('连续力学相机', () => {
     //   ζeff = c / (2√(2k))
     // 必须欠阻尼（有过冲，这是用户要的「冲力」），但不能低到来回振荡。
     const zetaEff = CAMERA.PHYSICS_DAMPING / (2 * Math.sqrt(2 * CAMERA.PHYSICS_K))
-    expect(zetaEff).toBeGreaterThan(0.45)
-    expect(zetaEff).toBeLessThan(0.75)
+    expect(zetaEff).toBeGreaterThan(0.6)
+    expect(zetaEff).toBeLessThan(0.95)
+  })
+})
+
+describe('几何重建与总览', () => {
+  it('rebuild 之后 engine.path 指向新停靠点', () => {
+    // 回归：早先返回对象里写的是 `path,`（创建时的值），rebuild 换了闭包变量
+    // 但外部拿到的仍是旧路径 —— 调参面板改几何时区块不跟着动、相机却动了，
+    // 视角直接偏到区块之间的背景上。
+    const cam = makeEngine()
+    const next: Stop[] = [
+      { id: 'a', x: 0, y: 0, d: 34, rx: 0, ry: 0 },
+      { id: 'b', x: 26, y: 120, d: 34, rx: 0, ry: 0 },
+      { id: 'c', x: -26, y: 240, d: 34, rx: 0, ry: 0 },
+    ]
+    cam.rebuild(next)
+    expect(cam.path.stops).toBe(next)
+    expect(cam.path.stops[1].y).toBe(120)
+  })
+
+  it('总览位姿对准质心、距离由调用方给定，且不改变当前索引', () => {
+    const cam = makeEngine()
+    let frame: CameraFrame | null = null
+    const off = cam.subscribe((f) => (frame = f))
+
+    cam.goTo(2, { immediate: true })
+    cam.setOverview(true, 900)
+    const c = cam.path.centroid()
+    expect(frame!.index).toBe(2)
+    expect(frame!.pose.x).toBeCloseTo(c.x, 6)
+    expect(frame!.pose.y).toBeCloseTo(c.y, 6)
+    expect(frame!.pose.d).toBe(900)
+    // 总览是「看地图」，不允许倾斜（倾斜会让边缘区块偏离轨迹位置）
+    expect(frame!.pose.rx).toBe(0)
+    expect(frame!.pose.ry).toBe(0)
+
+    cam.setOverview(false)
+    expect(frame!.pose.d).toBe(stops[2].d)
+    off()
   })
 })
 

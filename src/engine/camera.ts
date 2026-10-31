@@ -77,6 +77,15 @@ export interface Engine {
   dispatch(intent: Intent): void
   /** 重建空间路径（调参用，几何参数改了才需要）。 */
   rebuild(stops: readonly Stop[]): void
+  /**
+   * 开发用「总览」：把镜头拉远到能看见整个平面，位姿不再跟随路径。
+   *
+   * 只影响**渲染位姿**（`frame.pose`），不动 `phys.s` —— 所以滚动仍然在
+   * 改当前索引，总览里画出的相机标记会沿轨迹移动。`distance` 由调用方
+   * 按「整个平面要占多少屏幕」算好传进来（见 components/OverviewLayer.vue）。
+   */
+  setOverview(on: boolean, distance?: number): void
+  readonly overview: boolean
 }
 
 export function createCamera(cfg: CameraConfig): Engine {
@@ -104,6 +113,10 @@ export function createCamera(cfg: CameraConfig): Engine {
   /** 驱动运动模糊与动态倾斜：索引/秒 */
   let velocity = 0
   let dirVec = { x: 0, y: 0 }
+
+  /** 总览（开发用）：镜头拉远看整个平面，位姿不跟路径 */
+  let overview = false
+  let overviewDistance = 0
 
   let stopFrame: (() => void) | null = null
   let detach: (() => void) | null = null
@@ -139,11 +152,22 @@ export function createCamera(cfg: CameraConfig): Engine {
   function buildFrame(): CameraFrame {
     return {
       index: phys.s,
-      pose: currentPose(),
+      pose: overview ? overviewPose() : currentPose(),
       velocity,
       dir: dirVec,
       state: stateLabel(),
     }
+  }
+
+  /**
+   * 总览位姿：对准平面质心、正对内容面、距离由调用方给定。
+   *
+   * 倾角固定为 0：总览是「看地图」，不是「飞过去」，任何倾斜都会让
+   * 边缘的区块因透视偏移而偏离它在轨迹上的真实位置。
+   */
+  function overviewPose(): CameraPose {
+    const c = path.centroid()
+    return { x: c.x, y: c.y, d: Math.max(overviewDistance, CAMERA.BASE_DISTANCE), rx: 0, ry: 0 }
   }
 
   /**
@@ -399,7 +423,23 @@ export function createCamera(cfg: CameraConfig): Engine {
     get target(): number {
       return anchor
     },
-    path,
+    /**
+     * **必须是 getter**。早先写成 `path,`，对象属性在创建时就固定成了
+     * 最初那条路径 —— `rebuild()` 换掉了闭包里的 `path`，但外界拿到的
+     * 仍是旧路径。调参面板改几何时于是出现：相机按新路径移动、区块还停在
+     * 旧位置，视角直接偏到区块之间的背景上。
+     */
+    get path(): CameraPath {
+      return path
+    },
+    get overview(): boolean {
+      return overview
+    },
+    setOverview(on: boolean, distance?: number): void {
+      overview = on
+      if (distance !== undefined) overviewDistance = distance
+      emitFrame()
+    },
     rebuild(next: readonly Stop[]): void {
       path = buildPath(next)
       last = path.last

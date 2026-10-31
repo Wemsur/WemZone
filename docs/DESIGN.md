@@ -446,6 +446,7 @@ CSS 的 `blur()` 是各向同性的，像失焦不像运动。两套方案：
 | 积分步长跟着帧长走 | 过冲随刷新率变（16.7ms 1.03% / 1ms 2.67%） | 固定步长 `FIXED_STEP = 1/240s` + 累加器 |
 | 旋转补偿符号反了 | 倾斜时区块放大 46%，落位时缩回再弹 | 补偿矩阵的 `a/b` 与 `rotateX/Y` 同号 |
 | `.world-section` 用 `preserve-3d` | Zen（Gecko 159）上文字与卡片**逐帧消失又出现**，背景与 fixed 层不动 | 区块内两层共面，会进入 3D 排序且顺序不稳定；区块内不需要 3D，用默认 flat |
+| `Engine.path` 写成值属性 | 调几何参数后区块不跟着动、相机却按新路径走了，视角偏到区块之间的背景 | 改成 getter：`rebuild()` 换的是闭包里的变量，属性必须现取 |
 
 ---
 
@@ -615,6 +616,25 @@ launcher.scss omorphia.scss（variables → normalize → classes → defaults �
 直接读写 `CAMERA` 这个可变普通对象，引擎每帧现读，所以拖动立刻生效。
 几何类参数（间距 / 振幅 / 距离 / 透视）会触发 `rebuildStops()` 重建路径。
 改动自动存 localStorage，可恢复默认或导出成可粘回 `constants.ts` 的片段。
+
+**改默认值时要升 `STORAGE_KEY` 版本号**（当前 `wemzone.tuning.v3`）：旧存档
+会静默盖掉新默认值 —— 踩过一次（`DISTANCE_JITTER: 8` 把「距离恒定」的修复
+完全覆盖）。
+
+### 总览（`components/OverviewLayer.vue`，仅 DEV）
+
+调参面板的「打开总览」或按 `O`。打开后：
+
+- 引擎的 `setOverview(true, d)` 让 `frame.pose` 换成「对准平面质心、距离 d、
+  倾角 0」——只改渲染位姿，`phys.s` 不动，所以滚动仍在改索引；
+- 每个区块的静态 transform 关掉距离补偿（`compensate = false`）。否则镜头在
+  很远处时区块按 `d_i/d` 缩成小点、间距却不变，看到的不是平面本身；
+- 世界坐标里画一条相机轨迹（虚线）、各停靠点与区块名，以及相机当前位置。
+  轨迹随几何重建重算 —— 改间距 / 振幅时，能直接看出「路径是否仍穿过区块中心」。
+
+距离由调用方按「整个平面占屏幕 78%」算出来（宽高各算一次取大者）。
+线宽用 `vector-effect: non-scaling-stroke`：整张图在屏幕上缩到约 0.1 倍，
+普通 stroke 会一起缩成看不见。
 
 DEV 下还暴露了 `window.__camera`，可以在控制台读连续索引 / 速度或跳区。
 

@@ -5,6 +5,7 @@ import { useCamera } from '@/composables/useCamera'
 import type { BlurMode } from '@/engine/blur'
 import { CAMERA } from '@/engine/constants'
 import { getTimeScale, setTimeScale } from '@/engine/debug'
+import { overviewOn } from '@/lib/overview'
 
 /**
  * 调参面板（仅 DEV + 宽版）
@@ -110,7 +111,7 @@ const GROUPS: { title: string; knobs: Knob[] }[] = [
  * localStorage 里，把「距离恒定」的修复完全盖掉了，转场继续先缩后放。
  * 升版本等于让旧存档失效，用户从新默认值开始。
  */
-const STORAGE_KEY = 'wemzone.tuning.v2'
+const STORAGE_KEY = 'wemzone.tuning.v3'
 
 /** 当前值与默认值的快照。默认值在模块加载时抓一次，用于「恢复默认」。 */
 const DEFAULTS: Record<string, number> = {}
@@ -326,6 +327,19 @@ const blur = computed({
         <p class="note">
           只放慢引擎的时间（物理、力衰减、模糊、倾斜、空闲晃动），
           <strong>输入判定仍是真实时间</strong> —— 照常做一次操作，看它的动画被拉长。
+        </p>
+      </section>
+
+      <section class="group slowmo">
+        <h3>总览（开发）</h3>
+        <div class="seg">
+          <button :class="{ on: overviewOn }" @click="overviewOn = !overviewOn">
+            {{ overviewOn ? '关闭总览' : '打开总览' }}
+          </button>
+        </div>
+        <p class="note">
+          镜头拉远，看见整个平面与相机轨迹（虚线）以及各停靠点。改空间几何时用它
+          确认区块和轨迹是一起变的。按 <strong>O</strong> 也能切换。
         </p>
       </section>
 
