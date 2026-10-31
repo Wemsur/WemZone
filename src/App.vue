@@ -5,6 +5,8 @@ import MobileWorld from '@/components/MobileWorld.vue'
 import HomeSection from '@/components/sections/HomeSection.vue'
 import ContactSection from '@/components/sections/ContactSection.vue'
 import HomeTopBar from '@/components/sections/HomeTopBar.vue'
+import VideoSection from '@/components/sections/VideoSection.vue'
+import LauncherSection from '@/components/sections/LauncherSection.vue'
 import WorksSection from '@/components/sections/WorksSection.vue'
 import UnifiedCard from '@/components/sections/UnifiedCard.vue'
 import TuningPanel from '@/components/TuningPanel.vue'
@@ -57,7 +59,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   <MobileWorld v-if="narrow">
     <template v-for="section in ACTIVE_SECTIONS" :key="section.id" #[section.id]>
       <HomeSection v-if="section.id === 'home'" />
+      <LauncherSection v-else-if="section.id === 'launcher'" />
       <WorksSection v-else-if="section.id === 'works'" />
+      <VideoSection v-else-if="section.id === 'video'" />
       <ContactSection v-else-if="section.id === 'contact'" />
       <div v-else class="placeholder">
         <span class="placeholder-index">{{ section.label }}</span>
@@ -68,7 +72,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   <World v-else :blur-mode="effectiveBlur">
     <template v-for="section in ACTIVE_SECTIONS" :key="section.id" #[section.id]>
       <HomeSection v-if="section.id === 'home'" />
+      <LauncherSection v-else-if="section.id === 'launcher'" />
       <WorksSection v-else-if="section.id === 'works'" />
+      <VideoSection v-else-if="section.id === 'video'" />
       <ContactSection v-else-if="section.id === 'contact'" />
       <div v-else class="placeholder">
         <span class="placeholder-index">{{ section.label }}</span>

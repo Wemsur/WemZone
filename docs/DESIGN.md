@@ -668,3 +668,31 @@ source-in` 是 WebKit 的等价写法）。
 `--home-bg-image` / `--video-bg-image: url(...)`，其余逻辑不用动。
 图片层比视口大 12%，`cover` 铺满，再用 `mask` 在**它自己的边缘**渐隐 ——
 那条边永远在视口外，所以视野内看不到接缝、也不会出现黑边。
+
+---
+
+## 十四、B 站数据管线（`scripts/fetch-bilibili.mjs`）
+
+视频区的内容来自 B 站空间（UID `1826712095`），不写死。难点有三层：
+
+1. **CORS**：浏览器不能直连 B 站接口，必须服务端代理。
+2. **WBI 签名**：`x/space/wbi/arc/search` 要求从 nav 接口取两个密钥，
+   按固定置换表拼出 mixin key，再对排序后的参数做 md5（`w_rid`）。
+3. **风控**：不带 `buvid3` cookie 会直接返回风控 HTML；实测还需要浏览器式的
+   `Origin` / `Sec-Fetch-*` 头与 `dm_*` 指纹参数，否则返回 `-352` 或 `412`。
+
+流程：
+
+```
+scripts/fetch-bilibili.mjs  ──► src/data/videos.json（构建时快照）
+        │
+        └─ Vite 开发中间件 /api/bilibili/videos ──► 前端优先请求（实时）
+                                                      失败则用快照
+```
+
+- `node scripts/fetch-bilibili.mjs` 手动刷新快照；接口风控是**偶发**的，
+  失败重试一次通常就过。
+- 封面的 B 站图床有防盗链：Referer 为 localhost 时返回 403。前端 `<img>` 必须
+  带 `referrerpolicy="no-referrer"`。
+- 生产环境对应 `api/bilibili/videos.ts`（Vercel Serverless，Phase 5 接入）；
+  在它上线前，前端一直用构建时快照，不会空。
