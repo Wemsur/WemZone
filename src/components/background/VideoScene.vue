@@ -9,6 +9,7 @@ import {
 } from '@paper-design/shaders'
 import { ref } from 'vue'
 
+import videoBg from '@/assets/bg/video-bg.jpg'
 import { hsl } from '@/engine/background'
 
 import { useShaderLayers } from './useShaderLayers'
@@ -58,7 +59,7 @@ useShaderLayers([
 </script>
 
 <template>
-  <div class="scene" :style="{ '--hue': hue }">
+  <div class="scene" :style="{ '--hue': hue, '--video-image': `url(${videoBg})` }">
     <!-- 1. 背景图 + 遮罩。比视口大，边缘在视野外渐隐 -->
     <div class="photo" />
     <div class="photo-mask" />
@@ -87,7 +88,7 @@ useShaderLayers([
   position: absolute;
   inset: -12%;
   background-image:
-    var(--video-bg-image, none),
+    var(--video-image, none),
     radial-gradient(ellipse 78% 62% at 68% 26%, hsl(var(--hue) 26% 22%) 0%, transparent 62%),
     radial-gradient(ellipse 66% 58% at 22% 74%, #1c1a1f 0%, transparent 64%),
     linear-gradient(155deg, #191619 0%, #131315 52%, #0f1012 100%);

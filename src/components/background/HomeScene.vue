@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import homeBg from '@/assets/bg/home-bg.jpg'
+
 /**
  * 首页背景 —— 用户要求（原文）：
  *
@@ -14,15 +16,12 @@
  *  - 光晕是三团白色径向渐变，各自以不同周期/相位呼吸，位置分散在
  *    左上 / 右下 / 中上，于是「一会这里、一会那里」。
  *  - 点阵是极低透明度的重复径向渐变，只在暗部隐约可见。
- *
- * **背景图待补**：用户会提供一张 ≥2560px 的首页图（访谈 Q36）。在那之前
- * 用程序化的暗色渐变占位；接入时只需给 `.photo` 设 `--home-bg-image: url(...)`。
  */
 defineProps<{ hue: number }>()
 </script>
 
 <template>
-  <div class="scene" :style="{ '--hue': hue }">
+  <div class="scene" :style="{ '--hue': hue, '--home-image': `url(${homeBg})` }">
     <!-- 1. 背景图 + 遮罩。比视口大，边缘在视野外渐隐 -->
     <div class="photo" />
     <div class="photo-mask" />
@@ -54,7 +53,7 @@ defineProps<{ hue: number }>()
   /* 比视口大：保证任何窗口比例下都铺满、且渐隐边落在视野外 */
   inset: -12%;
   background-image:
-    var(--home-bg-image, none),
+    var(--home-image, none),
     radial-gradient(ellipse 80% 60% at 30% 24%, #342e28 0%, transparent 62%),
     radial-gradient(ellipse 70% 55% at 76% 72%, #232a32 0%, transparent 64%),
     linear-gradient(160deg, #201f1d 0%, #171717 48%, #121214 100%);
@@ -67,15 +66,20 @@ defineProps<{ hue: number }>()
 }
 
 /* 遮罩：把图片整体压暗，保证正文可读 */
+/* 遮罩：把图片整体压暗，保证正文可读。
+   图片本身很亮（概念艺术），所以除了自上而下的渐变，还在标题位置压一层
+   径向暗部 —— 否则白字直接压在花丛上看不清。 */
 .photo-mask {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    to bottom,
-    rgb(10 10 10 / 0.3) 0%,
-    rgb(10 10 10 / 0.18) 45%,
-    rgb(10 10 10 / 0.46) 100%
-  );
+  background:
+    radial-gradient(ellipse 46% 34% at 50% 47%, rgb(8 8 8 / 0.42) 0%, transparent 72%),
+    linear-gradient(
+      to bottom,
+      rgb(8 8 8 / 0.5) 0%,
+      rgb(8 8 8 / 0.34) 45%,
+      rgb(8 8 8 / 0.62) 100%
+    );
 }
 
 /* --- 呼吸光晕 --- */

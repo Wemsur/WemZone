@@ -46,8 +46,10 @@ import Hitokoto from '@/components/sections/Hitokoto.vue'
   display: flex;
   align-items: baseline;
   gap: 0.9rem;
-  /* 让标识在背景的呼吸光晕上略微「浮」起来 */
-  filter: drop-shadow(0 0 2.4rem hsl(var(--wz-brand-hue) 60% 50% / 0.22));
+  /* 一层暗影保证压在亮背景图上也读得清，一层品牌色柔光负责氛围 */
+  filter:
+    drop-shadow(0 0.2rem 1.1rem rgb(0 0 0 / 0.6))
+    drop-shadow(0 0 2.4rem hsl(var(--wz-brand-hue) 60% 50% / 0.22));
 }
 
 .tingyu {
@@ -73,7 +75,8 @@ import Hitokoto from '@/components/sections/Hitokoto.vue'
   font-size: 1rem;
   letter-spacing: 0.16em;
   color: var(--wz-text-tertiary);
-  opacity: 0.85;
+  opacity: 0.92;
+  text-shadow: 0 0.1rem 0.8rem rgb(0 0 0 / 0.7);
 }
 
 @media (max-width: 900px) and (orientation: portrait) {

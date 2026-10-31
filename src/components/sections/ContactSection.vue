@@ -11,14 +11,11 @@
  * 所以这里没有卡片、没有光晕、没有点阵 —— 只有几行文字与链接。
  * 统一卡片在这一区自动淡出（见 `UnifiedCard.vue` 的可见度曲线）。
  *
- * **待补**：B 站空间地址与邮箱。GitHub 已确认是 Wemsur。
  */
 const LINKS = [
   { label: 'GitHub', href: 'https://github.com/Wemsur', hint: '@Wemsur' },
-  // TODO(等待用户提供)：B 站 UID / 空间地址
-  { label: 'Bilibili', href: 'https://space.bilibili.com/', hint: '@Wemsur' },
-  // TODO(等待用户提供)：邮箱
-  { label: 'Email', href: 'mailto:', hint: '待补充' },
+  { label: 'Bilibili', href: 'https://space.bilibili.com/1826712095', hint: '1826712095' },
+  { label: 'Email', href: 'mailto:iexamplecom@outlook.com', hint: 'iexamplecom@outlook.com' },
 ]
 </script>
 

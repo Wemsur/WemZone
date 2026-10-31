@@ -106,7 +106,7 @@ function go(index: number): void {
 
         <a
           class="icon"
-          href="https://space.bilibili.com/"
+          href="https://space.bilibili.com/1826712095"
           target="_blank"
           rel="noopener noreferrer"
           aria-label="哔哩哔哩"

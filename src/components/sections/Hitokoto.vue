@@ -189,6 +189,7 @@ onBeforeUnmount(() => {
   letter-spacing: 0.04em;
   color: var(--wz-text-default);
   text-wrap: balance;
+  text-shadow: 0 0.1rem 0.7rem rgb(0 0 0 / 0.65);
 }
 
 .typing {
