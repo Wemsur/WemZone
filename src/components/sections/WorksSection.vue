@@ -67,6 +67,17 @@ const hoverA = ref(false)
 const hoverB = ref(false)
 let copyWidth = 1
 
+/**
+ * 只接受鼠标（或触控笔）的悬停。
+ * 触屏上 pointerenter 会在手指按到卡片时触发，而 pointerleave 不一定会补发
+ * —— 那一行会从此停住不动。窄版根本不需要「悬停减速」。
+ */
+function setHover(target: 'a' | 'b', on: boolean, e: PointerEvent): void {
+  if (e.pointerType === 'touch') return
+  if (target === 'a') hoverA.value = on
+  else hoverB.value = on
+}
+
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v
 }
@@ -185,8 +196,8 @@ onBeforeUnmount(() => {
       <!-- 行 A：向左滚。悬停时整行减速 -->
       <div
         class="row"
-        @pointerenter="hoverA = true"
-        @pointerleave="hoverA = false"
+        @pointerenter="setHover('a', true, $event)"
+        @pointerleave="setHover('a', false, $event)"
       >
         <div ref="rowA" class="track">
           <div v-for="c in copies" :key="c" :ref="c === 0 ? setCopyA : undefined" class="copy">
@@ -209,8 +220,8 @@ onBeforeUnmount(() => {
       <!-- 行 B：向右滚 -->
       <div
         class="row"
-        @pointerenter="hoverB = true"
-        @pointerleave="hoverB = false"
+        @pointerenter="setHover('b', true, $event)"
+        @pointerleave="setHover('b', false, $event)"
       >
         <div ref="rowB" class="track">
           <div v-for="c in copies" :key="c" :ref="c === 0 ? setCopyB : undefined" class="copy">

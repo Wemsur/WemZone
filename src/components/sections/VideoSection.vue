@@ -145,7 +145,9 @@ function setCopy(el: Element | ComponentPublicInstance | null): void {
   copyEl.value = (el as HTMLElement) ?? null
 }
 
-function setHover(i: number, on: boolean): void {
+function setHover(i: number, on: boolean, e?: PointerEvent): void {
+  // 触屏的 pointerenter 没有配对的 pointerleave，会让那一行永久停住
+  if (e && e.pointerType === 'touch') return
   hover[i] = on
 }
 
@@ -210,8 +212,8 @@ function playText(n: number): string {
         v-for="r in rowList"
         :key="r"
         class="row"
-        @pointerenter="setHover(r, true)"
-        @pointerleave="setHover(r, false)"
+        @pointerenter="setHover(r, true, $event)"
+        @pointerleave="setHover(r, false, $event)"
       >
         <div :ref="(el) => setRow(r, el as Element | null)" class="track">
           <div

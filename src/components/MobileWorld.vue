@@ -159,6 +159,8 @@ function sectionStyle(i: number): Record<string, string> {
   overscroll-behavior-y: contain;
   /* 触屏上滚动条是多余的装饰（且会压住右侧导航） */
   scrollbar-width: none;
+  /* 只接管纵向手势：横向滑动留给内容（卡片轨道） */
+  touch-action: pan-y;
 }
 
 .mobile-scroll::-webkit-scrollbar {
@@ -174,7 +176,12 @@ function sectionStyle(i: number): Record<string, string> {
   scroll-snap-stop: always;
   display: grid;
   place-items: center;
-  padding: 2rem 1.25rem;
+  /* safe-area：刘海 / 圆角 / 底部小白条。不加的话内容会被传感器区压住 */
+  padding:
+    calc(1.6rem + env(safe-area-inset-top, 0px))
+    calc(1.25rem + env(safe-area-inset-right, 0px))
+    calc(1.6rem + env(safe-area-inset-bottom, 0px))
+    calc(1.25rem + env(safe-area-inset-left, 0px));
   box-sizing: border-box;
 }
 
@@ -199,7 +206,7 @@ function sectionStyle(i: number): Record<string, string> {
 /* 右侧区块导航。fixed 相对视口，不随容器滚动。 */
 .mobile-nav {
   position: fixed;
-  right: 0.35rem;
+  right: calc(0.35rem + env(safe-area-inset-right, 0px));
   top: 50%;
   z-index: 20;
   display: flex;

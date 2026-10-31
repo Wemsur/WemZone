@@ -2,9 +2,12 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover：让页面铺到刘海屏的圆角/传感器区下面。
+         否则 iOS 会在两侧留安全边距，整屏背景会被切掉一条。
+         真正的安全区由 MobileWorld 的 padding 用 env(safe-area-inset-*) 让开。 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <!-- 让手机地址栏 / 状态栏与页面底色一致，否则竖屏下上下各有一条异色横带 -->
-    <meta name="theme-color" content="#1a1a1a" />
+    <meta name="theme-color" content="#0b0b0b" />
     <title>庭域 WemZone</title>
     <meta name="description" content="WemZone（庭域）—— Wemsur 的个人主页。" />
     <link rel="icon" type="image/svg+xml" href="./src/assets/favicon.svg" />
