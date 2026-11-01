@@ -36,18 +36,28 @@ const camera = provideCamera()
 /** 深链接：URL hash ↔ 当前区块（含前进/后退支持）。 */
 useDeepLink(camera)
 
-/** 运动模糊方案。Phase 2 用面板手动切换，Phase 5 定稿后写死。 */
+/**
+ * 运动模糊方案。
+ *
+ * Phase 2 的 A/B 原型已定稿为 **A**（各向同性 blur + 沿运动轴拉伸）。
+ * B（SVG 各向异性 feGaussianBlur）实测在整页 DOM 子树上极慢，只留作开发
+ * 对比：生产构建里无论怎么切都只用 A，连 B 键也不响应。
+ */
 const blurMode = ref<BlurMode>('A')
 
 /** 用户要求减少动效时，模糊一并关掉（相机那边已经跳过了弹簧与补间）。 */
 const reduceMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
-const effectiveBlur = computed<BlurMode>(() => (reduceMotion.value ? 'off' : blurMode.value))
+const effectiveBlur = computed<BlurMode>(() =>
+  reduceMotion.value ? 'off' : import.meta.env.DEV ? blurMode.value : 'A',
+)
 
 /** 调试 UI 只在 DEV + 宽版显示。 */
 const showDebug = computed(() => import.meta.env.DEV && !narrow.value)
 
 /** 按 B 键循环切换模糊方案。 */
 function onKey(e: KeyboardEvent): void {
+  // A/B 对比是开发工具，生产构建里不响应
+  if (!import.meta.env.DEV) return
   if (e.key !== 'b' && e.key !== 'B') return
   const order: BlurMode[] = ['off', 'A', 'B']
   blurMode.value = order[(order.indexOf(blurMode.value) + 1) % order.length]

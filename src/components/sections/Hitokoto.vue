@@ -47,8 +47,58 @@ const reduced =
 
 /* ---------------- 一言数据 ---------------- */
 
+/**
+ * 本地缓存
+ *
+ * 一言是装饰，但它也是最脆的一环（第三方接口、跨域、风控）。把取到过的句子
+ * 存进 localStorage：下次打开站点**立刻**就有内容可轮换，网络请求只是补充。
+ * 缓存满了就丢最旧的（先进先出），最多 `CACHE_MAX` 条。
+ */
+const CACHE_KEY = 'wemzone.hitokoto.v1'
+const CACHE_MAX = 40
+
 const fetched: Quote[] = []
 let fetching = false
+
+function loadCache(): void {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY)
+    if (!raw) return
+    const list = JSON.parse(raw) as Quote[]
+    if (Array.isArray(list)) {
+      for (const q of list) {
+        if (q && typeof q.text === 'string' && q.text.length > 0) fetched.push(q)
+      }
+    }
+  } catch {
+    // 损坏 / 隐私模式：忽略即可，兜底句还在
+  }
+}
+
+function saveCache(): void {
+  try {
+    // 只保留最近 CACHE_MAX 条（fetched 是 FIFO 队列）
+    localStorage.setItem(CACHE_KEY, JSON.stringify(fetched.slice(-CACHE_MAX)))
+  } catch {
+    // 配额满 / 隐私模式：缓存是可选优化，失败不影响显示
+  }
+}
+
+/**
+ * 取句子的接口。
+ *
+ * 官方有两个入口（主站与 international），**随机挑一个**，再随机挑一个分类
+ * （文学 / 诗词 / 哲学 / 原创）—— 站点气质偏静，不要「抖机灵」那类。
+ * 不接第三方镜像：它们随时会挂，而一言挂掉时我们已经有缓存与兜底。
+ */
+const SOURCES = ['https://v1.hitokoto.cn/', 'https://international.v1.hitokoto.cn/']
+const CATEGORIES = ['d', 'i', 'k', 'e']
+
+function pickUrl(): string {
+  const base = SOURCES[Math.floor(Math.random() * SOURCES.length)]
+  const c = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)]
+  return `${base}?encode=json&max_length=42&c=${c}`
+}
 
 async function fetchOne(): Promise<void> {
   if (fetching) return
@@ -56,17 +106,19 @@ async function fetchOne(): Promise<void> {
   try {
     const ctrl = new AbortController()
     const timeout = window.setTimeout(() => ctrl.abort(), 4000)
-    const res = await fetch('https://v1.hitokoto.cn/?encode=json&max_length=42', {
-      signal: ctrl.signal,
-    })
+    const res = await fetch(pickUrl(), { signal: ctrl.signal })
     window.clearTimeout(timeout)
     if (!res.ok) return
     const data = (await res.json()) as { hitokoto?: string; from_who?: string; from?: string }
     if (typeof data.hitokoto === 'string' && data.hitokoto.length > 0) {
-      fetched.push({ text: data.hitokoto, from: data.from_who || data.from || '一言' })
+      const q = { text: data.hitokoto, from: data.from_who || data.from || '一言' }
+      if (!fetched.some((x) => x.text === q.text)) {
+        fetched.push(q)
+        saveCache()
+      }
     }
   } catch {
-    // 离线 / 超时 / CORS：保持兜底
+    // 离线 / 超时 / CORS：保持缓存与兜底
   } finally {
     fetching = false
   }
@@ -74,10 +126,13 @@ async function fetchOne(): Promise<void> {
 
 let fallbackIndex = Math.floor(Math.random() * FALLBACK.length)
 
-/** 取下一句：优先用已取到的，没有就用兜底并顺手再请求一次 */
+/** 取下一句：优先用缓存/已取到的，没有就用兜底并顺手再请求一次 */
 function nextQuote(): Quote {
   if (fetched.length > 0) {
+    // 轮换而不是消费：取出来的放回队尾，缓存不会越用越少
     const q = fetched.shift() as Quote
+    fetched.push(q)
+    saveCache()
     void fetchOne() // 保持缓冲区不空
     return q
   }
@@ -143,7 +198,10 @@ function startQuotes(): void {
   )
 }
 
-onMounted(startTyping)
+onMounted(() => {
+  loadCache()
+  startTyping()
+})
 
 onBeforeUnmount(() => {
   for (const t of timers) window.clearTimeout(t)
