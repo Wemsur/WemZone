@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import launcherShot from '@/assets/bg/launcher-placeholder.png'
 import { useCamera, useCameraFrame } from '@/composables/useCamera'
 import { narrow } from '@/lib/viewport'
+
+/**
+ * 真实启动器小窗（Phase 6）。**异步加载**：vendor 组件库约 900KB，
+ * 只有相机靠近本区时才需要，不该压首屏。
+ */
+const LauncherWindow = defineAsyncComponent(() => import('./launcher/LauncherWindow.vue'))
 
 /**
  * Celestial Launcher 区
@@ -12,9 +18,9 @@ import { narrow } from '@/lib/viewport'
  *   「这个分层/动画功能后置做，在我部署完之后再做，开始做一个图片放在那里
  *     下落并左移，后续再替换为分层 + 真实启动器小窗」
  *
- * 所以现在只有：一张真实的启动器截图，进入本区时**从上方下落并左移**到
- * 左侧，右侧的标题/介绍/按钮随后浮上来。后续会用分层动画替换掉这张静图
- * （真实启动器窗口复刻属于 Phase 6）。
+ * 进入本区时窗口**从上方下落并左移**到左侧，右侧的标题/介绍/按钮随后浮上来。
+ * 窗口本身已经是复刻的启动器（`launcher/LauncherWindow.vue`，Phase 6），
+ * 截图只在组件 chunk 还没加载完时充当占位。
  *
  * ## 为什么用「时间轴」而不是「相机索引」
  *
@@ -27,6 +33,12 @@ const camera = useCamera()
 const root = ref<HTMLElement | null>(null)
 const panel = ref<HTMLElement | null>(null)
 const copy = ref<HTMLElement | null>(null)
+
+/**
+ * 是否已经渲染真实窗口。相机靠近本区（索引 > 0.45）或窄版进入视野时置真，
+ * 之后就保持 —— chunk 已经加载过，重新卸载/挂载没有意义。
+ */
+const showWindow = ref(false)
 
 const DURATION = 1150
 let raf = 0
@@ -85,6 +97,8 @@ function play(): void {
 
 useCameraFrame((frame) => {
   if (narrow.value) return
+  // 提前一个区开始加载，等相机真的到了这里，窗口已经在画面上
+  if (frame.index > 0.45) showWindow.value = true
   const isNear = frame.index > 0.9 && frame.index < 1.18
   if (isNear && !near) play()
   near = isNear
@@ -99,7 +113,12 @@ onMounted(() => {
     if (typeof IntersectionObserver !== 'undefined' && el) {
       io = new IntersectionObserver(
         (entries) => {
-          for (const e of entries) if (e.isIntersecting && e.intersectionRatio > 0.5) play()
+          for (const e of entries) {
+            if (e.isIntersecting && e.intersectionRatio > 0.5) {
+              showWindow.value = true
+              play()
+            }
+          }
         },
         { threshold: [0.55] },
       )
@@ -111,6 +130,8 @@ onMounted(() => {
   }
 
   const i = camera.engine.displayIndex
+  // 深链接直接落在本区：窗口与入场都要就位
+  if (i > 0.45) showWindow.value = true
   if (i > 0.9 && i < 1.18) play()
   else apply(0)
 })
@@ -126,7 +147,11 @@ onBeforeUnmount(() => {
 <template>
   <div ref="root" class="launcher">
     <div ref="panel" class="shot-wrap">
-      <img class="shot" :src="launcherShot" alt="Celestial Launcher 截图" draggable="false" />
+      <!-- 真实小窗；chunk 未就绪或尚未靠近本区时，用截图占位 -->
+      <div v-if="showWindow" class="window-frame">
+        <LauncherWindow />
+      </div>
+      <img v-else class="shot" :src="launcherShot" alt="Celestial Launcher 截图" draggable="false" />
     </div>
 
     <div ref="copy" class="copy">
@@ -161,6 +186,12 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   will-change: transform, opacity;
   opacity: 0;
+}
+
+.window-frame {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  max-height: 60vh;
 }
 
 .shot {

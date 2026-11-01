@@ -180,6 +180,12 @@ export function createInput(opts: InputOptions): InputSource {
 
   function onKeyDown(e: KeyboardEvent): void {
     if (e.repeat) return
+    // 焦点在输入框 / 滑块里时，方向键归控件（调参面板的数值框、灵敏度滑块），
+    // 不要再顺手翻页
+    const t = e.target as HTMLElement | null
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) {
+      return
+    }
     switch (e.key) {
       case 'ArrowDown':
       case 'PageDown':

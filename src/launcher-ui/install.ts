@@ -159,7 +159,13 @@ export function ensureTagsLoaded(): Promise<void> {
  * `<Teleport to="#teleports">`（弹窗、下拉、tooltip）。这个目标节点
  * 必须存在于 DOM 里，否则 Vue 会警告并且内容无处可去。
  */
+let installed = false
+
 export function installLauncherUi(app: App): void {
+  // 幂等：启动器小窗可能在热更新后重新挂载，重复 app.use 会重复注册插件
+  if (installed) return
+  installed = true
+
   // vendor 组件大量使用 <Teleport to="#teleports">，目标节点要先存在
   ensureTeleportTarget()
 
