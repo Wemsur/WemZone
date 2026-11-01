@@ -12,6 +12,8 @@ import {
   INSTANCES,
   LIBRARIES,
   LOADERS,
+  SEARCH_PROJECTS,
+  SEARCH_RESULT_V3,
   SETTINGS,
 } from './data'
 
@@ -114,6 +116,15 @@ const HANDLERS: Record<string, Handler> = {
   'plugin:instance|instance_list_game_options_sync_sources': () => [],
   'plugin:instance|instance_list_all_screenshots': () => [],
   'plugin:cache|purge_cache_types': () => undefined,
+  // 浏览页：搜索走 Rust 侧的缓存命令，这里直接返回固定结果
+  'plugin:cache|get_search_results_v3': () => SEARCH_RESULT_V3,
+  'plugin:cache|get_search_results_v3_many': () => [SEARCH_RESULT_V3],
+  'plugin:cache|get_search_results': () => SEARCH_RESULT_V3,
+  'plugin:cache|get_search_results_many': () => [SEARCH_RESULT_V3],
+  'plugin:cache|get_project_v3': (args) =>
+    SEARCH_PROJECTS.find((p) => p.project_id === args.id || p.slug === args.id) ?? SEARCH_PROJECTS[0],
+  'plugin:cache|get_project': (args) =>
+    SEARCH_PROJECTS.find((p) => p.project_id === args.id || p.slug === args.id) ?? SEARCH_PROJECTS[0],
   'plugin:plugins|plugin_list': () => [],
   'plugin:onboarding-checklist|get_onboarding_checklist': () => ({
     has_created_instance: true,

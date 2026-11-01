@@ -517,8 +517,10 @@ Vite alias 把 11 个 `@tauri-apps/*` 精确映射到 mock（`vite.config.ts` �
 router）由 `installLauncherUi(app, { router })` 装上；`router` 传入启动器
 自己的路由表（memory history），不污染站点 URL。
 
-样例数据在 `src/launcher-app-mock/data.ts`（15 个实例、内容库、设置、标签），
-命令表在 `handlers.ts`。**未实现的命令按名字猜空值返回，绝不抛错** ——
+样例数据在 `src/launcher-app-mock/data.ts`（15 个实例、内容库、设置、标签、
+浏览页的 6 个整合包），命令表在 `handlers.ts`。浏览页的数据也走 Tauri：
+`plugin:cache|get_search_results_v3` 直接返回固定结果（形状对齐
+`Labrinth.Search.v3.SearchResults`），所以离线也能看到卡片。**未实现的命令按名字猜空值返回，绝不抛错** ——
 启动器启动时会打一批与界面无关的命令（广告、更新、遥测），抛错会白屏。
 
 > 注意：`packages/ui` 自 Phase 1.5 之后有漂移（新增 `AddLibraryModal` 等），

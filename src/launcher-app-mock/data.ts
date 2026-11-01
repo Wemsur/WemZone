@@ -152,3 +152,71 @@ export const CATEGORIES = [
   { name: 'technology', project_type: 'modpack', header: 'categories' },
   { name: 'magic', project_type: 'modpack', header: 'categories' },
 ]
+
+
+/* ---------------------------------------------------------------------------
+   浏览页（Discover）的样例数据
+   ---------------------------------------------------------------------------
+   Browse 页走的是 `plugin:cache|get_search_results_v3`（Rust 侧的搜索缓存）。
+   这里返回一份固定结果，形状对齐 `Labrinth.Search.v3.ResultSearchProject`。
+   icon_url 用 null：界面会画默认方块图标，和没有自定义图标的实例一致。
+--------------------------------------------------------------------------- */
+
+function modpack(over: {
+  id: string
+  slug: string
+  name: string
+  summary: string
+  downloads: number
+  follows: number
+  categories: string[]
+  loaders: string[]
+  versions: string[]
+  color?: number
+}): Record<string, unknown> {
+  return {
+    project_id: over.id,
+    project_types: ['modpack'],
+    all_project_types: ['modpack'],
+    slug: over.slug,
+    author: '样例数据',
+    author_id: null,
+    organization: null,
+    organization_id: null,
+    name: over.name,
+    summary: over.summary,
+    categories: over.categories,
+    display_categories: over.categories,
+    downloads: over.downloads,
+    follows: over.follows,
+    icon_url: null,
+    date_created: '2024-01-01T00:00:00.000Z',
+    date_modified: '2026-09-01T00:00:00.000Z',
+    license: 'MIT',
+    gallery: [],
+    featured_gallery: null,
+    color: over.color ?? null,
+    loaders: over.loaders,
+    versions: over.versions,
+    disclosure_types: [],
+  }
+}
+
+export const SEARCH_PROJECTS = [
+  modpack({ id: 'mp-fo', slug: 'fabulously-optimized', name: 'Fabulously Optimized', summary: '让 Minecraft 跑得更快、更好看的一体化整合包。', downloads: 18694984, follows: 12000, categories: ['optimization'], loaders: ['fabric'], versions: ['26.3', '1.21.8'], color: 0x5b8cff }),
+  modpack({ id: 'mp-rlcraft', slug: 'rlcraft', name: 'RLCraft', summary: '硬核生存：真实环境、更强的怪物、更深的探索。', downloads: 40000000, follows: 30000, categories: ['adventure', 'challenging'], loaders: ['forge'], versions: ['1.12.2'], color: 0xff5b5b }),
+  modpack({ id: 'mp-create-astral', slug: 'create-astral', name: 'Create: Astral', summary: '以机械动力为核心的科技整合包。', downloads: 5200000, follows: 6100, categories: ['technology'], loaders: ['forge'], versions: ['1.20.1'], color: 0xffa64d }),
+  modpack({ id: 'mp-better-mc', slug: 'better-mc', name: 'Better MC', summary: '在原版基础上扩充生物群系、结构与内容。', downloads: 9000000, follows: 8000, categories: ['adventure'], loaders: ['fabric'], versions: ['1.21.4'], color: 0x63c76a }),
+  modpack({ id: 'mp-all-of-fabric', slug: 'all-of-fabric', name: 'All of Fabric', summary: 'Fabric 生态里几乎所有主流模组的合集。', downloads: 3100000, follows: 3400, categories: ['technology', 'magic'], loaders: ['fabric'], versions: ['1.21.1'], color: 0xb06bff }),
+  modpack({ id: 'mp-dawncraft', slug: 'dawncraft', name: 'DawnCraft', summary: '高难度 RPG 冒险整合包，探索与战斗并重。', downloads: 2400000, follows: 2900, categories: ['adventure', 'magic'], loaders: ['forge'], versions: ['1.20.1'], color: 0x8a6bff }),
+]
+
+/** `plugin:cache|get_search_results_v3` 的返回形状 */
+export const SEARCH_RESULT_V3 = {
+  result: {
+    hits: SEARCH_PROJECTS,
+    page: 1,
+    hits_per_page: 20,
+    total_hits: SEARCH_PROJECTS.length,
+  },
+}
