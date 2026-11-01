@@ -9,11 +9,50 @@
     <!-- 让手机地址栏 / 状态栏与页面底色一致，否则竖屏下上下各有一条异色横带 -->
     <meta name="theme-color" content="#0b0b0b" />
     <title>庭域 WemZone</title>
-    <meta name="description" content="WemZone（庭域）—— Wemsur 的个人主页。" />
+    <meta name="description" content="WemZone（庭域）—— Wemsur 的个人主页：Celestial Launcher、开源项目与视频。" />
     <link rel="icon" type="image/svg+xml" href="./src/assets/favicon.svg" />
+
+    <!-- 社交分享卡片。没有独立的 og:image：站点的视觉就是背景图与 3D 平面，
+         静态一张缩略图代表不了，留空比放一只不相关的图好。 -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="庭域 WemZone" />
+    <meta property="og:description" content="Wemsur 的个人主页：Celestial Launcher、开源项目与视频。" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta name="twitter:card" content="summary" />
   </head>
   <body>
     <div id="app"></div>
+
+    <!-- 无 JS 兜底（R8）：整站是相机引擎驱动的，脚本被禁用时什么都不显示，
+         所以给一段线性文字版，保证内容仍然可读、可跳转。 -->
+    <noscript>
+      <div
+        style="
+          max-width: 40rem;
+          margin: 12vh auto 0;
+          padding: 0 1.5rem;
+          color: #d8d2ce;
+          font-family: 'HarmonyOS Sans SC', -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+          line-height: 1.9;
+        "
+      >
+        <h1 style="font-size: 1.6rem; letter-spacing: 0.08em; margin: 0 0 0.4rem">
+          庭域 WemZone
+        </h1>
+        <p style="color: #a8a09b; margin: 0 0 1.2rem">Wemsur 的个人主页 · 需要启用 JavaScript 才能看到 3D 版本</p>
+        <ul style="padding-left: 1.2rem; margin: 0 0 1.2rem">
+          <li>Celestial Launcher —— 基于 Modrinth 的 Minecraft 启动器</li>
+          <li>其它作品 —— Celestial-Web、插件商店等项目</li>
+          <li>视频 —— B 站持续更新的 Minecraft 内容</li>
+        </ul>
+        <p style="margin: 0">
+          <a href="https://github.com/Wemsur" style="color: #e8a184">GitHub</a> ·
+          <a href="https://space.bilibili.com/1826712095" style="color: #e8a184">哔哩哔哩</a> ·
+          <a href="mailto:iexamplecom@outlook.com" style="color: #e8a184">邮箱</a>
+        </p>
+      </div>
+    </noscript>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

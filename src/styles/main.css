@@ -379,3 +379,45 @@ body {
   background: var(--color-brand-highlight);
   color: var(--color-text-primary);
 }
+
+
+/* ==========================================================================
+   键盘焦点
+
+   引擎接管了滚动，键盘用户只有 Tab 能走遍导航。默认焦点环在深色玻璃卡片上
+   几乎看不见，所以统一给一条高对比度的品牌色轮廓（只在 :focus-visible 时出现，
+   鼠标点击不显示）。
+   ========================================================================== */
+:where(a, button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--wz-brand-soft);
+  outline-offset: 3px;
+  border-radius: 0.3rem;
+}
+
+/* ==========================================================================
+   打印
+
+   整站是一块固定舞台：直接打印只有当前一屏，而且 position: fixed 的元素会在
+   每一页重复。打印时隐藏舞台与所有 screen-space 控件，换成线性文档
+   （components/PrintDoc.vue）。
+   ========================================================================== */
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  #stage,
+  .topbar,
+  .unified-card,
+  .site-footer,
+  .mobile-scroll,
+  .mobile-nav,
+  .tuner,
+  .tuner-fab,
+  .hud,
+  .blur-svg {
+    display: none !important;
+  }
+}

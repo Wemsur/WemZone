@@ -22,8 +22,8 @@ npm test           # 引擎单元测试
 | Phase 1.5 | vendor 启动器组件库，打通管线 | ✅ 完成 |
 | Phase 2 | 运动模糊 A/B 原型 + 基础交互 | ✅ 完成 |
 | Phase 3 | 背景系统（每区独立场景，随区块移动） | ✅ 完成 |
-| Phase 4 | 内容填充（首页/启动器占位/其它作品/视频/联系） | 🚧 进行中（文案与移动端待做） |
-| Phase 5 | 交互调参 + 性能打磨 + 部署 | 待做 |
+| Phase 4 | 内容填充（首页/启动器占位/其它作品/视频/联系） | ✅ 完成（文案待你改） |
+| Phase 5 | 交互调参 + 移动端适配 + 无障碍/打印兜底 + 生产 API | ✅ 完成（部署待做） |
 | Phase 6 | 启动器 5 页面复刻（部署后） | 待做 |
 
 ## 文档
@@ -33,6 +33,15 @@ npm test           # 引擎单元测试
 | [docs/DISCOVERY.md](docs/DISCOVERY.md) | 三轮需求访谈全文、已确认决策表、核实过的技术事实 |
 | [docs/DESIGN.md](docs/DESIGN.md) | 架构决策与理由（为什么这样做、为什么不那样做） |
 | `~/.claude/plans/40-a-41-b-bubbly-dolphin.md` | 分阶段开发路径（会话计划文件） |
+
+## 部署
+
+静态站点 + 一个 Serverless 函数：
+
+- `npm run build` 产出 `dist/`，直接托管即可（`base: './'`，可放子路径）。
+- `api/bilibili/videos.ts` 是 B 站代理（Vercel 会自动识别 `api/` 目录）。
+  没有它站点也能跑 —— 前端会退回构建时快照 `src/data/videos.json`。
+- 刷新快照：`node scripts/fetch-bilibili.mjs`。
 
 ## 硬性约束
 

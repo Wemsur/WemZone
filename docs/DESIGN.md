@@ -772,8 +772,10 @@ scripts/fetch-bilibili.mjs  ──► src/data/videos.json（构建时快照）
   失败重试一次通常就过。
 - 封面的 B 站图床有防盗链：Referer 为 localhost 时返回 403。前端 `<img>` 必须
   带 `referrerpolicy="no-referrer"`。
-- 生产环境对应 `api/bilibili/videos.ts`（Vercel Serverless，Phase 5 接入）；
-  在它上线前，前端一直用构建时快照，不会空。
+- 生产环境是 `api/bilibili/videos.ts`（Vercel Serverless，逻辑同源：
+  直接 import 同一个 `fetchVideos`）。**失败也返回 200 + 快照**：对前端来说
+  「上游挂了」与「用旧数据」没有区别，视频区不该因此空掉。成功缓存 10 分钟
+  （`s-maxage` 让 CDN 也缓存），失败只缓 60 秒。
 
 ---
 

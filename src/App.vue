@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import MobileWorld from '@/components/MobileWorld.vue'
+import PrintDoc from '@/components/PrintDoc.vue'
 import HomeSection from '@/components/sections/HomeSection.vue'
 import ContactSection from '@/components/sections/ContactSection.vue'
 import HomeTopBar from '@/components/sections/HomeTopBar.vue'
@@ -98,6 +99,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   </div>
 
   <TuningPanel v-if="showDebug" v-model:blur-mode="blurMode" />
+
+  <!-- 打印版：屏幕上是 display:none，只在 @media print 下替换掉 3D 舞台 -->
+  <PrintDoc />
 </template>
 
 <style scoped>
