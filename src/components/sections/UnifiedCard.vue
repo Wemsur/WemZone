@@ -30,6 +30,26 @@ const card = ref<HTMLElement | null>(null)
 /** 卡片在下半屏时灵敏度条翻到上方（tooltip 也跟着翻） */
 const flipped = ref(false)
 
+/**
+ * 左侧进度条的元素。
+ *
+ * 高亮**跟随相机连续索引**，不是等落位后才切：在 2 → 3 的转场里，
+ * 第 3 根条会随进度逐渐变长变亮，到中点左右就与第 2 根相当。
+ * 每帧直接写样式（5 个元素，代价可忽略），不走响应式。
+ */
+const barEls: (HTMLElement | null)[] = []
+function setBar(i: number, el: Element | null): void {
+  barEls[i] = (el as HTMLElement | null) ?? null
+}
+
+let brandHue = ''
+function hue(): string {
+  if (brandHue === '') {
+    brandHue = getComputedStyle(document.documentElement).getPropertyValue('--wz-brand-hue').trim() || '18'
+  }
+  return brandHue
+}
+
 /** 卡片尺寸：定位时要用，缓存下来避免每帧读布局 */
 const size = { w: 176, h: 120 }
 let resizeObserver: ResizeObserver | null = null
@@ -115,6 +135,19 @@ useCameraFrame((frame) => {
   const flip = p.y > window.innerHeight * 0.5
   el.classList.toggle('flip', flip)
   if (flipped.value !== flip) flipped.value = flip
+
+  // 进度条：按「离相机当前索引多远」连续高亮
+  const h = hue()
+  for (let i = 0; i < barEls.length; i++) {
+    const bar = barEls[i]
+    if (!bar) continue
+    const t = clamp(1 - Math.abs(frame.index - i), 0, 1)
+    bar.style.width = `${(1.15 + 0.7 * t).toFixed(3)}rem`
+    bar.style.backgroundColor =
+      t > 0.01
+        ? `color-mix(in srgb, hsl(${h} 72% 75%) ${(t * 100).toFixed(1)}%, rgb(255 255 255 / 0.22))`
+        : ''
+  }
 })
 
 onMounted(() => {
@@ -138,8 +171,8 @@ onBeforeUnmount(() => {
       <button
         v-for="(section, i) in ACTIVE_SECTIONS"
         :key="section.id"
+        :ref="(el) => setBar(i, el as Element | null)"
         class="bar"
-        :class="{ current: camera.current.value === i }"
         type="button"
         role="tab"
         :aria-selected="camera.current.value === i"
@@ -252,21 +285,13 @@ onBeforeUnmount(() => {
   border-radius: 1px;
   background: rgb(255 255 255 / 0.22);
   cursor: pointer;
-  /* 不是「高亮一段」，而是整根条变长变亮 */
-  transition:
-    width 320ms cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 260ms ease,
-    opacity 260ms ease;
+  /* 宽度与颜色由 JS 每帧按「离当前索引多远」连续写（跟随转场进度），
+     所以这里不要 transition —— 否则会和拖后腿的补间叠在一起。 */
+  transition: filter 160ms ease;
 }
 
 .bar:hover {
-  background: rgb(255 255 255 / 0.45);
-}
-
-.bar.current {
-  width: 1.85rem;
-  background: var(--wz-brand-soft);
-  opacity: 1;
+  filter: brightness(1.7);
 }
 
 /* --- 正文 --- */

@@ -5,6 +5,7 @@ import MobileWorld from '@/components/MobileWorld.vue'
 import HomeSection from '@/components/sections/HomeSection.vue'
 import ContactSection from '@/components/sections/ContactSection.vue'
 import HomeTopBar from '@/components/sections/HomeTopBar.vue'
+import SiteFooter from '@/components/SiteFooter.vue'
 import VideoSection from '@/components/sections/VideoSection.vue'
 import LauncherSection from '@/components/sections/LauncherSection.vue'
 import WorksSection from '@/components/sections/WorksSection.vue'
@@ -87,6 +88,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
   <!-- 统一卡片：全站只有一张，跟随相机在区块锚点间沿曲线移动 -->
   <UnifiedCard v-if="!narrow" />
+  <SiteFooter v-if="!narrow" />
 
   <!-- 调试信息（Phase 2 临时，Phase 4/5 移除） -->
   <div v-if="showDebug" class="hud">
