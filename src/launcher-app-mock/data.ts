@@ -341,3 +341,55 @@ export function activate(api) {
   })
 }
 `
+
+
+/* ---------------------------------------------------------------------------
+   实例内容（内容 tab 的样例 mod）
+   ---------------------------------------------------------------------------
+   形状对齐 `@modrinth/ui` 的 `ContentItem`（后端把这些字段直接序列化过来）。
+   icon_url 用 null：界面画默认方块图标，和「没有自定义图标」的实例一致。
+--------------------------------------------------------------------------- */
+function contentItem(over: {
+  file: string
+  id: string
+  slug: string
+  title: string
+  version: string
+  owner: string
+  type?: string
+  enabled?: boolean
+  update?: boolean
+}): Record<string, unknown> {
+  return {
+    id: over.file,
+    file_name: over.file,
+    project_type: over.type ?? 'mod',
+    has_update: over.update ?? false,
+    update_version_id: over.update ? `${over.id}-next` : null,
+    enabled: over.enabled ?? true,
+    project: { id: over.id, slug: over.slug, title: over.title, icon_url: null },
+    version: {
+      id: `${over.id}-v1`,
+      version_number: over.version,
+      file_name: over.file,
+      date_published: '2026-05-01T00:00:00.000Z',
+    },
+    owner: { id: `u-${over.owner}`, name: over.owner, type: 'user' },
+    source_kind: 'local',
+    external: false,
+  }
+}
+
+export const CONTENT_ITEMS = [
+  contentItem({ file: 'fabric-api-0.92.2.jar', id: 'P7dR8mSH', slug: 'fabric-api', title: 'Fabric API', version: '0.92.2+26.3', owner: 'modmuss50' }),
+  contentItem({ file: 'sodium-0.6.9.jar', id: 'AANobbMI', slug: 'sodium', title: 'Sodium', version: '0.6.9+26.3', owner: 'jellysquid3' }),
+  contentItem({ file: 'iris-1.8.0.jar', id: 'YL57xq9U', slug: 'iris', title: 'Iris Shaders', version: '1.8.0+26.3', owner: 'coderbot' }),
+  contentItem({ file: 'lithium-0.14.3.jar', id: 'gvQqBUqZ', slug: 'lithium', title: 'Lithium', version: '0.14.3+26.3', owner: 'jellysquid3' }),
+  contentItem({ file: 'modmenu-11.0.2.jar', id: 'mOgUt4GM', slug: 'modmenu', title: 'Mod Menu', version: '11.0.2', owner: 'Prospector' }),
+  contentItem({ file: 'cloth-config-15.0.140.jar', id: '9s6osm5g', slug: 'cloth-config', title: 'Cloth Config API', version: '15.0.140', owner: 'shedaniel' }),
+  contentItem({ file: 'xaeros-minimap-26.1.0.jar', id: '1bokaNcj', slug: 'xaeros-minimap', title: "Xaero's Minimap", version: '26.1.0', owner: 'xaero96' }),
+  contentItem({ file: 'jei-19.0.0.1.jar', id: 'u6dRKJwZ', slug: 'jei', title: 'Just Enough Items', version: '19.0.0.1', owner: 'mezz', update: true }),
+]
+
+/** 纯原版 / 空实例不塞 mod */
+export const INSTANCES_WITHOUT_CONTENT = ['i-vanilla', 'i-dungeons', 'i-空']

@@ -9,6 +9,8 @@
 import {
   ACCOUNT,
   CATEGORIES,
+  CONTENT_ITEMS,
+  INSTANCES_WITHOUT_CONTENT,
   CURSEFORGE_ENTRY,
   CURSEFORGE_SUMMARY,
   GAME_VERSIONS,
@@ -73,8 +75,12 @@ const HANDLERS: Record<string, Handler> = {
   'plugin:instance|instance_get_many': getByIds,
   'plugin:instance|instance_get': findInstance,
   'plugin:instance|instance_list_groups': () => [],
-  'plugin:instance|instance_get_content_items': () => [],
-  'plugin:instance|instance_get_installed_project_ids': () => [],
+  'plugin:instance|instance_get_content_items': (args) =>
+    INSTANCES_WITHOUT_CONTENT.includes(String(args.instanceId)) ? [] : CONTENT_ITEMS,
+  'plugin:instance|instance_get_content_skeleton': (args) =>
+    INSTANCES_WITHOUT_CONTENT.includes(String(args.instanceId)) ? [] : CONTENT_ITEMS,
+  'plugin:instance|instance_get_installed_project_ids': () =>
+    CONTENT_ITEMS.map((i) => (i.project as { id: string }).id),
   'plugin:instance|instance_get_projects': () => [],
   'plugin:instance|instance_check_installed': () => false,
   'plugin:instance|instance_get_game_setting_locale_labels': () => ({}),
