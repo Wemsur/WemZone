@@ -11,6 +11,10 @@
  * （不是静默降级）。所以只要渲染到依赖某个 provider 的组件，缺一个就白屏。
  */
 
+// 样式与 install 绑定在一起：只有真正加载启动器组件库时才下载这 300KB CSS，
+// 并且一定排在 main.css 之后（vendor 令牌要覆盖 WemZone 的同名令牌）。
+import '@/styles/launcher.scss'
+
 import { GenericModrinthClient, type Labrinth } from '@modrinth/api-client'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import FloatingVue from 'floating-vue'
@@ -156,6 +160,9 @@ export function ensureTagsLoaded(): Promise<void> {
  * 必须存在于 DOM 里，否则 Vue 会警告并且内容无处可去。
  */
 export function installLauncherUi(app: App): void {
+  // vendor 组件大量使用 <Teleport to="#teleports">，目标节点要先存在
+  ensureTeleportTarget()
+
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },

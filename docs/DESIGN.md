@@ -478,6 +478,13 @@ CSS 的 `blur()` 是各向同性的，像失焦不像运动。两套方案：
 目标：**渲染的必须是启动器本人**，不是仿制品。为此把上游的包以**源码**形式
 复制进 `src/vendor/`，让 WemZone 的构建链直接编译它们。
 
+> **按需加载（2026-11 补充）**：vendor 的 UI barrel 会把整个组件库拉进首屏 ——
+> 实测入口 JS 从 172KB 涨到 1068KB、CSS 多出 300KB，而当前页面根本没用任何
+> vendor 组件。所以 `installLauncherUi` 与 `launcher.scss` 不再在 `main.ts`
+> 里静态引入，等 Phase 6 的启动器小窗挂载时再
+> `await import('@/launcher-ui/install')`。样式顺序不变：`launcher.scss`
+> 由 `install.ts` 引入，动态加载时一定排在 `main.css` 之后。
+
 ### 11.1 搬了什么、没搬什么
 
 | 上游 | 落点 | 处理 |
