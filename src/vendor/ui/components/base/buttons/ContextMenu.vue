@@ -94,7 +94,7 @@ defineExpose({ open: openMenu, close: closeMenu })
 </script>
 
 <template>
-	<Teleport v-if="isClient" to="body">
+	<Teleport v-if="isClient" to="#teleports">
 		<ButtonMenuPanel
 			ref="panel"
 			:open="isOpen"

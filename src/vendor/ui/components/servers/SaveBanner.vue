@@ -1,5 +1,5 @@
 <template>
-	<Teleport to="body">
+	<Teleport to="#teleports">
 		<FloatingActionBar :shown="props.isVisible">
 			<p class="m-0 font-semibold text-sm md:text-base">You have unsaved changes.</p>
 			<div class="ml-auto flex gap-2">

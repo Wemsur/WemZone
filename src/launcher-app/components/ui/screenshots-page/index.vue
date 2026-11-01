@@ -1613,7 +1613,7 @@ onBeforeUnmount(() => {
 						</ScreenshotGroupSection>
 					</div>
 				</div>
-				<Teleport to="body">
+				<Teleport to="#teleports">
 					<div class="pointer-events-none fixed inset-0 z-[9999]">
 						<DragOverlay :drop-animation="null">
 							<div

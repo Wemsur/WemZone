@@ -14,6 +14,7 @@
 // 样式与 install 绑定在一起：只有真正加载启动器组件库时才下载这 300KB CSS，
 // 并且一定排在 main.css 之后（vendor 令牌要覆盖 WemZone 的同名令牌）。
 import '@/styles/launcher.scss'
+import 'overlayscrollbars/overlayscrollbars.css'
 
 import { GenericModrinthClient, type Labrinth } from '@modrinth/api-client'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
@@ -22,6 +23,8 @@ import type { App } from 'vue'
 import { defineComponent, h, provide, ref, type Ref } from 'vue'
 import { createI18n } from 'vue-i18n'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
+
+import { overlayScrollbarsDirective } from '@/launcher-app/directives/overlayScrollbars'
 
 import {
   AbstractPopupNotificationManager,
@@ -67,6 +70,18 @@ export const i18n = createI18n({
   fallbackWarn: false,
   messages: buildLocaleMessages(localeModules, appLocaleModules),
 })
+
+/**
+ * 切换启动器界面的语言。
+ *
+ * 启动器前端原来自带一套 i18n（`launcher-app/i18n.config.ts`），但组件里的
+ * `useVIntl` 读的是 `I18N_INJECTION_KEY` —— 也就是这里这一个实例。所以语言
+ * 切换必须落在这里，两套实例并存只会出现「设置里选了中文、界面还是英文」。
+ */
+export function setLauncherLocale(requested: string): void {
+  i18n.global.locale.value = requested || 'en-US'
+  document.documentElement.setAttribute('lang', requested || 'en-US')
+}
 
 /**
  * 内存版通知管理器。
@@ -181,8 +196,9 @@ export function installLauncherUi(app: App, opts?: { router?: Router }): void {
   if (installed) return
   installed = true
 
-  // vendor 组件大量使用 <Teleport to="#teleports">，目标节点要先存在
-  ensureTeleportTarget()
+  // **不**在 body 上创建 #teleports：启动器的 App.vue 自己会在**小窗内部**
+  // 渲染一个 <div id="teleports">，Teleport 会解析到它。若这里再建一个，
+  // 它排在文档更前面，弹窗就会盖到整个网站上（用户明确要求弹窗只在窗口内）。
 
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -199,7 +215,12 @@ export function installLauncherUi(app: App, opts?: { router?: Router }): void {
   })
   app.use(opts?.router ?? stubRouter)
 
+  // 启动器侧边栏用了 v-overlay-scrollbars（App.vue 里），不注册会警告且滚动条样式丢失
+  app.directive('overlay-scrollbars', overlayScrollbarsDirective)
+
   app.use(FloatingVue, {
+    // tooltip 也放进启动器小窗的 #teleports，别飘到整个网站上
+    container: '#teleports',
     themes: {
       // 这两个 theme 是组件硬依赖（v-tooltip 的 theme 名写死在模板里），
       // 不注册的话 tooltip 会以未样式化状态出现或直接不显示。

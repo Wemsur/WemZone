@@ -97,7 +97,7 @@ async function removeLibrary(path: string) {
 		</p>
 
 		<!-- Add Modal -->
-		<Teleport to="body">
+		<Teleport to="#teleports">
 			<transition name="fade">
 				<div v-if="showAddModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
 					<div class="bg-[#1e1e1e] border border-gray-700 rounded-lg p-6 w-96">

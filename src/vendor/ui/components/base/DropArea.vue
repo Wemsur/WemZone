@@ -1,5 +1,5 @@
 <template>
-	<Teleport to="body">
+	<Teleport to="#teleports">
 		<div
 			ref="dropAreaRef"
 			class="drop-area"

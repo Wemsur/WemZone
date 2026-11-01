@@ -18,7 +18,7 @@
 		/>
 	</button>
 
-	<Teleport v-if="isClient" to="body">
+	<Teleport v-if="isClient" to="#teleports">
 		<Transition name="floating-expand">
 			<div
 				v-if="isOpen"

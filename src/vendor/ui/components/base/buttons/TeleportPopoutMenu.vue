@@ -128,7 +128,7 @@ defineExpose({ open: openMenu, close: closeMenu })
 		<slot name="trigger" />
 	</component>
 
-	<Teleport v-if="isClient" to="body">
+	<Teleport v-if="isClient" to="#teleports">
 		<Transition name="floating-expand">
 			<div
 				v-if="isOpen"

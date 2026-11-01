@@ -204,7 +204,7 @@ async function handleDragEnd(event: DragEndEvent) {
 		@drag-end="handleDragEnd"
 	>
 		<slot />
-		<Teleport to="body">
+		<Teleport to="#teleports">
 			<div class="pointer-events-none fixed inset-0 z-[9999]">
 				<DragOverlay :drop-animation="null">
 					<div
@@ -224,7 +224,7 @@ async function handleDragEnd(event: DragEndEvent) {
 		:target="gatherTarget"
 		@complete="finishGather"
 	/>
-	<Teleport to="body">
+	<Teleport to="#teleports">
 		<div
 			ref="instanceGroupDragStatusPopover"
 			popover="manual"

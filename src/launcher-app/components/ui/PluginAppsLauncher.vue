@@ -23,7 +23,7 @@
 			<LayoutGridIcon />
 		</button>
 
-		<Teleport to="body">
+		<Teleport to="#teleports">
 			<div
 				v-if="open"
 				ref="panelEl"

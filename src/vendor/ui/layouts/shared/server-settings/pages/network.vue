@@ -1,6 +1,6 @@
 <template>
 	<div>
-		<Teleport to="body">
+		<Teleport to="#teleports">
 			<div class="relative z-[100]">
 				<NewModal ref="editAllocationModal" header="Edit allocation" width="550px">
 					<form class="flex w-full flex-col gap-2" @submit.prevent="editAllocation">

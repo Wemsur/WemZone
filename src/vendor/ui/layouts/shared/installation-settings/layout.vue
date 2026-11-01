@@ -1031,7 +1031,7 @@ const messages = defineMessages({
 	</div>
 
 	<!-- Modals -->
-	<Teleport to="body">
+	<Teleport to="#teleports">
 		<div class="relative z-[100]">
 			<ContentUpdaterModal
 				v-if="form.updatingModpack.value"

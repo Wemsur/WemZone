@@ -76,7 +76,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-	<Teleport to="body">
+	<Teleport to="#teleports">
 		<div
 			class="pointer-events-none fixed inset-0 z-[9998] overflow-hidden transition-opacity duration-150 ease-out"
 			:class="finishing ? 'opacity-0' : 'opacity-100'"

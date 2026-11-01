@@ -1,5 +1,5 @@
 <template>
-	<Teleport to="body">
+	<Teleport to="#teleports">
 		<section
 			v-if="showControls"
 			ref="controlsEl"

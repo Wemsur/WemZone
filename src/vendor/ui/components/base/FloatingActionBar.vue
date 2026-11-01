@@ -205,7 +205,7 @@ defineOptions({
 </script>
 
 <template>
-	<Teleport to="body" :disabled="inline">
+	<Teleport to="#teleports" :disabled="inline">
 		<Transition name="floating-action-bar" appear>
 			<div
 				v-if="shown"

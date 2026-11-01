@@ -1,6 +1,6 @@
 <template>
 	<div class="flex flex-col gap-6">
-		<Teleport to="body">
+		<Teleport to="#teleports">
 			<div class="relative z-[100]">
 				<ConfirmModal
 					ref="resetToOnboardingModal"
@@ -40,7 +40,7 @@
 			</template>
 
 			<template #extra-modals>
-				<Teleport to="body">
+				<Teleport to="#teleports">
 					<div class="relative z-[100]">
 						<ServerSetupModal
 							ref="setupModal"

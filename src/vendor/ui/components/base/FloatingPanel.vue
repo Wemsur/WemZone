@@ -263,7 +263,7 @@ defineExpose({
 			<slot></slot>
 		</Button>
 
-		<Teleport to="body">
+		<Teleport to="#teleports">
 			<Transition
 				enter-active-class="floating-panel-enter-active"
 				enter-from-class="floating-panel-enter-from"

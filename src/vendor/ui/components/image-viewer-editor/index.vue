@@ -217,7 +217,7 @@ defineExpose({ show, edit, hide, next, previous, markSavedAndView })
 </script>
 
 <template>
-	<Teleport to="body">
+	<Teleport to="#teleports">
 		<div
 			v-if="activeItem"
 			class="fixed inset-0 z-[110] overflow-hidden bg-black/95 text-white"

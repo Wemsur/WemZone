@@ -235,7 +235,7 @@ const listMaxHeight = computed(() => `${panelHeight.value - 120}px`)
 </script>
 
 <template>
-	<Teleport to="body">
+	<Teleport to="#teleports">
 		<Transition
 			enter-active-class="transition-all duration-200 ease-out"
 			enter-from-class="opacity-0 translate-y-3 scale-95"

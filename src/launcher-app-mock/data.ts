@@ -93,7 +93,7 @@ export const SETTINGS = {
   max_concurrent_downloads: 6,
   max_concurrent_writes: 6,
   theme: 'customdark',
-  locale: 'en-US',
+  locale: 'zh-CN',
   default_page: 'Home',
   collapsed_navigation: false,
   hide_nametag_skins_page: false,
@@ -220,3 +220,124 @@ export const SEARCH_RESULT_V3 = {
     total_hits: SEARCH_PROJECTS.length,
   },
 }
+
+
+/* ---------------------------------------------------------------------------
+   默认 Minecraft 账号（离线）
+   ---------------------------------------------------------------------------
+   形状对齐 `AccountsCard.vue` 的 `MinecraftCredential`：profile + offline + active。
+--------------------------------------------------------------------------- */
+export const ACCOUNT = {
+  profile: { id: '00000000-0000-0000-0000-000000000001', name: 'Wemsur' },
+  offline: true,
+  active: true,
+}
+
+/* ---------------------------------------------------------------------------
+   CurseForge 内容源（样例）
+   ---------------------------------------------------------------------------
+   内容源是「后端安装的插件」：`content_source_list` 给出 manifest，loader 再把
+   entry 读出来执行 `activate(api)`，由它 `api.register(provider)`。这里把
+   entry 的源码直接以字符串返回，loader 会用 blob URL 执行它。
+--------------------------------------------------------------------------- */
+export const CURSEFORGE_MANIFEST = {
+  id: 'curseforge',
+  name: 'CurseForge',
+  version: '1.0.0',
+  description: 'CurseForge 内容源（样例数据）',
+  author: 'WemZone',
+  homepage: 'https://www.curseforge.com',
+  icon: null,
+  color: '#f16436',
+  detail_format: 'markdown',
+  api_version: 1,
+  entry: 'main.js',
+  content_types: ['modpack', 'mod'],
+  capabilities: {
+    search: true,
+    browse: true,
+    detail: false,
+    versions: false,
+    resolve_download: false,
+    open_download: false,
+    update_check: false,
+  },
+  hosts: ['api.curseforge.com'],
+  auth: null,
+  manual_entry: [],
+  settings: [],
+}
+
+export const CURSEFORGE_SUMMARY = {
+  id: 'curseforge',
+  dir_name: 'curseforge',
+  path: '/mock/sources/curseforge',
+  enabled: true,
+  manifest: CURSEFORGE_MANIFEST,
+  error: null,
+}
+
+/** entry 的源码：loader 会把它当 ES module 执行 */
+export const CURSEFORGE_ENTRY = `
+export function activate(api) {
+  const packs = [
+    {
+      sourceId: 'curseforge', id: 'cf-rlcraft', contentType: 'modpack',
+      name: 'RLCraft', summary: '硬核生存：真实环境、更强的怪物、更深的探索。',
+      author: 'Shivaxi', downloads: 40000000, follows: 30000,
+      publishedAt: '2019-06-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+      gameVersions: ['1.12.2'], loaders: ['forge'], tags: ['Adventure', 'Hardcore'],
+    },
+    {
+      sourceId: 'curseforge', id: 'cf-create-astral', contentType: 'modpack',
+      name: 'Create: Astral', summary: '以机械动力为核心的科技整合包。',
+      author: 'LudoCrypt', downloads: 5200000, follows: 6100,
+      publishedAt: '2023-02-01T00:00:00.000Z', updatedAt: '2026-07-01T00:00:00.000Z',
+      gameVersions: ['1.20.1'], loaders: ['forge'], tags: ['Technology'],
+    },
+    {
+      sourceId: 'curseforge', id: 'cf-dawncraft', contentType: 'modpack',
+      name: 'DawnCraft', summary: '高难度 RPG 冒险整合包，探索与战斗并重。',
+      author: 'DawnCraft Team', downloads: 2400000, follows: 2900,
+      publishedAt: '2023-05-01T00:00:00.000Z', updatedAt: '2026-06-01T00:00:00.000Z',
+      gameVersions: ['1.20.1'], loaders: ['forge'], tags: ['Adventure', 'RPG'],
+    },
+    {
+      sourceId: 'curseforge', id: 'cf-atm9', contentType: 'modpack',
+      name: 'All the Mods 9', summary: '经典 ATM 系列，几乎所有主流模组一网打尽。',
+      author: 'ATM Team', downloads: 12800000, follows: 15000,
+      publishedAt: '2023-06-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z',
+      gameVersions: ['1.20.1'], loaders: ['forge', 'neoforge'], tags: ['Technology', 'Magic'],
+    },
+    {
+      sourceId: 'curseforge', id: 'cf-vault-hunters', contentType: 'modpack',
+      name: 'Vault Hunters 3rd Edition', summary: 'RPG 地牢探险与科技结合的大型整合包。',
+      author: 'Iskall85', downloads: 9700000, follows: 12000,
+      publishedAt: '2022-11-01T00:00:00.000Z', updatedAt: '2026-05-01T00:00:00.000Z',
+      gameVersions: ['1.18.2'], loaders: ['forge'], tags: ['Adventure', 'RPG'],
+    },
+    {
+      sourceId: 'curseforge', id: 'cf-better-mc', contentType: 'modpack',
+      name: 'Better MC [FORGE]', summary: '在原版基础上扩充生物群系、结构与内容。',
+      author: 'Luna Pixel Studios', downloads: 9000000, follows: 8000,
+      publishedAt: '2021-09-01T00:00:00.000Z', updatedAt: '2026-08-15T00:00:00.000Z',
+      gameVersions: ['1.20.1'], loaders: ['forge'], tags: ['Adventure'],
+    },
+  ]
+
+  function page(items) {
+    return { items, total: items.length }
+  }
+
+  api.register({
+    async browse() {
+      return page(packs)
+    },
+    async search(request) {
+      const q = String(request && request.query ? request.query : '').toLowerCase()
+      const items = q ? packs.filter((p) => p.name.toLowerCase().includes(q)) : packs
+      return page(items)
+    },
+  })
+}
+`

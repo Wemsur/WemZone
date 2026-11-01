@@ -7,7 +7,10 @@
  */
 
 import {
+  ACCOUNT,
   CATEGORIES,
+  CURSEFORGE_ENTRY,
+  CURSEFORGE_SUMMARY,
   GAME_VERSIONS,
   INSTANCES,
   LIBRARIES,
@@ -100,9 +103,29 @@ const HANDLERS: Record<string, Handler> = {
   'plugin:metadata|metadata_get_loader_versions': () => [],
 
   /* ---- 账号 ---- */
-  'plugin:auth|get_users': () => [],
-  'plugin:auth|get_default_user': () => null,
+  'plugin:auth|get_users': () => [ACCOUNT],
+  'plugin:auth|get_default_user': () => ACCOUNT.profile.id,
+  'plugin:auth|set_default_user': () => undefined,
   'plugin:auth|check_reachable': () => true,
+  'plugin:auth|create_offline_user': () => ACCOUNT,
+  'plugin:auth|remove_user': () => undefined,
+  'plugin:minecraft-skins|get_available_skins': () => [],
+  'plugin:minecraft-skins|get_available_capes': () => [],
+
+  /* ---- 内容源（CurseForge 样例） ---- */
+  'plugin:content-sources|content_source_list': () => [CURSEFORGE_SUMMARY],
+  'plugin:content-sources|content_source_get': () => CURSEFORGE_SUMMARY,
+  'plugin:content-sources|content_source_read_entry': () => CURSEFORGE_ENTRY,
+  'plugin:content-sources|content_source_set_enabled': () => CURSEFORGE_SUMMARY,
+  'plugin:content-sources|content_source_storage_get': () => null,
+  'plugin:content-sources|content_source_storage_set': () => undefined,
+  'plugin:content-sources|content_source_storage_remove': () => undefined,
+  'plugin:content-sources|content_source_storage_keys': () => [],
+  'plugin:content-sources|content_source_settings_get': () => ({}),
+  'plugin:content-sources|content_source_install': () => CURSEFORGE_SUMMARY,
+  'plugin:content-sources|content_source_install_from_url': () => CURSEFORGE_SUMMARY,
+  'plugin:content-sources|content_source_uninstall': () => undefined,
+  'plugin:content-sources|content_source_latest_release': () => null,
 
   /* ---- 其它界面会用到的空数据 ---- */
   'plugin:ads|should_show_ads_consent_popup': () => false,
