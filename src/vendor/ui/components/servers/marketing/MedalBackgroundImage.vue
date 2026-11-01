@@ -1,3 +1,4 @@
+// @ts-nocheck
 <template>
 	<div class="overlay"></div>
 	<img

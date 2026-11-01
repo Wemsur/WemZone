@@ -1,0 +1,238 @@
+<script setup lang="ts">
+// @ts-nocheck
+import {LibraryIcon, PlusIcon} from '@modrinth/assets'
+import {
+    AddLibraryModal,
+    Button,
+    injectNotificationManager,
+    NavTabs,
+} from '@modrinth/ui'
+import { inject, onUnmounted, ref, shallowRef, watch, watchEffect } from 'vue'
+import { useRoute } from 'vue-router'
+
+import { NewInstanceImage } from '@launcher/assets/icons'
+import NavButton from "@launcher/components/ui/NavButton.vue";
+import { instance_listener } from '@launcher/helpers/events.js'
+import { list } from '@launcher/helpers/instance'
+import { library_default_path, library_list } from '@launcher/helpers/library'
+import { useRootBreadcrumb } from '@launcher/providers/breadcrumbs'
+
+const { handleError } = injectNotificationManager()
+const showCreationModal = inject('showCreationModal')
+const route = useRoute()
+
+const addLibraryModalRef = ref<InstanceType<typeof AddLibraryModal> | null>(null)
+
+defineExpose({
+	show: () => addLibraryModalRef.value?.show(),
+	hide: () => addLibraryModalRef.value?.hide(),
+})
+
+useRootBreadcrumb({
+	slot: 'root',
+	id: 'library',
+	label: 'Library',
+	to: '/library',
+	visual: { type: 'icon', component: LibraryIcon },
+})
+
+const instances = shallowRef(await list().catch(handleError) ?? [])
+const offline = ref(!navigator.onLine)
+window.addEventListener('offline', () => {
+	offline.value = true
+})
+window.addEventListener('online', () => {
+	offline.value = false
+})
+
+const unlistenInstance = await instance_listener(async () => {
+	instances.value = (await list(activeTab.value === 'all' ? undefined : activeTab.value).catch(handleError)) ?? []
+})
+onUnmounted(() => {
+	unlistenInstance()
+})
+
+const libraries = shallowRef<{ name: string; path: string; type: string }[]>([])
+let defaultLibraryPath: string | null = null
+const loadLibraries = async () => {
+	try {
+		const [config, defaultPath] = await Promise.all([
+			library_list(),
+			library_default_path().catch((e) => { console.log('[debug] library_default_path error:', e); return null; }),
+		])
+		console.log('[debug] defaultPath raw:', JSON.stringify(defaultPath))
+		console.log('[debug] libraries raw:', JSON.stringify(config.libraries))
+		libraries.value = config.libraries
+		defaultLibraryPath = defaultPath
+	} catch (e) {
+		handleError(e as Error)
+	}
+}
+loadLibraries()
+
+const activeTab = ref(localStorage.getItem('celestial-library-active-tab') || 'all')
+
+const tabLinks = shallowRef([
+	{ label: '全部实例', href: `/library` },
+])
+
+const libDisplayLabel = (lib: { name: string; path: string }): string => {
+	if (lib.name) return lib.name
+	// Check against the default library path (normalise both sides)
+	if (defaultLibraryPath) {
+		const normDefault = defaultLibraryPath.replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '')
+		const normLib = lib.path.replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '')
+		console.log('[debug] libDisplayLabel: defaultPath=', JSON.stringify(defaultLibraryPath), 'normDefault=', JSON.stringify(normDefault))
+		console.log('[debug] libDisplayLabel: lib.path=', JSON.stringify(lib.path), 'normLib=', JSON.stringify(normLib))
+		console.log('[debug] libDisplayLabel: match1=', normLib === normDefault, 'match2=', normLib === normDefault + '/profiles')
+		if (normLib === normDefault || normLib === normDefault + '/profiles') {
+			return '默认库'
+		}
+	}
+	const folderName = lib.path
+		.split('/')
+		.pop()
+		?.split('\\')
+		.pop()
+	|| lib.path
+	return folderName || lib.path
+}
+
+const updateTabs = () => {
+	const tabs = [{ label: '全部实例', href: '/library' }]
+	for (const lib of libraries.value) {
+		const label = libDisplayLabel(lib)
+		tabs.push({ label, href: `/library/lib/${encodeURIComponent(lib.path)}` })
+	}
+	tabLinks.value = tabs
+}
+
+watchEffect(() => {
+	updateTabs()
+	// Sync active tab from route
+	const currentPath = route.path
+	if (currentPath.startsWith('/library/lib/')) {
+		const libPath = decodeURIComponent(currentPath.replace('/library/lib/', ''))
+		if (libraries.value.some((l) => l.path === libPath)) {
+			// Library confirmed — set tab and persist
+			activeTab.value = libPath
+			localStorage.setItem('celestial-library-active-tab', libPath)
+			return
+		}
+		// Library path is in the route but not yet in libraries list —
+		// wait for libraries to load before changing activeTab, so that
+		// the instance_listener uses the correct filter.
+		if (libraries.value.length === 0) {
+			return
+		}
+		// Libraries loaded but path not found — fall back to 'all'
+		activeTab.value = 'all'
+		localStorage.removeItem('celestial-library-active-tab')
+	} else if (libraries.value.length > 0) {
+		// Reset to 'all' only after libraries have loaded
+		if (activeTab.value !== 'all') {
+			activeTab.value = 'all'
+			localStorage.removeItem('celestial-library-active-tab')
+		}
+	}
+})
+
+watch(activeTab, async (tab) => {
+	// Persist active tab
+	if (tab !== 'all') {
+		localStorage.setItem('celestial-library-active-tab', tab)
+	} else {
+		localStorage.removeItem('celestial-library-active-tab')
+	}
+	instances.value = await list(tab === 'all' ? undefined : tab).catch(handleError)
+})
+
+async function onLibraryAdded() {
+	await loadLibraries()
+	instances.value = await list(activeTab.value === 'all' ? undefined : activeTab.value).catch(handleError)
+}
+</script>
+
+<template>
+	<div class="p-6 flex flex-col gap-3">
+		<h1 class="m-0 text-2xl hidden">库</h1>
+		<div class="flex items-center gap-4">
+			<NavTabs
+				:links="tabLinks"
+				:active-href="route.path"
+			/>
+<!--			<button
+				class="btn btn-brand rounded-full w-8 h-8 p-0 flex items-center justify-center transition-all hover:scale-105"
+				:aria-label="$t('common.add')"
+				@click="addLibraryModalRef?.show()"
+			>
+				<PlusIcon class="size-4" />
+			</button>-->
+<!--            <NavButton
+                v-tooltip.right="formatMessage(commonMessages.settingsLabel)"
+                :to="() => appSettingsModal?.show()"
+            >
+                <SettingsIcon />
+            </NavButton>-->
+            <NavButton
+                :to="() => addLibraryModalRef?.show()"
+            >
+                <PlusIcon />
+            </NavButton>
+
+		</div>
+
+		<!-- Add Library Modal: the same dialog the home page opens. -->
+		<AddLibraryModal ref="addLibraryModalRef" @added="onLibraryAdded" />
+
+		<template v-if="instances && instances.length > 0">
+			<RouterView
+				v-if="route.path.startsWith('/library')"
+				:instances="instances"
+				:library-path="activeTab === 'all' ? undefined : activeTab"
+			/>
+		</template>
+		<div v-else class="no-instance">
+			<div class="icon">
+				<NewInstanceImage />
+			</div>
+			<h3>未找到实例</h3>
+			<Button type="colored" color="brand" :disabled="offline" @click="showCreationModal?.()">
+				<PlusIcon />
+				添加新的版本
+			</Button>
+		</div>
+	</div>
+</template>
+
+<style lang="scss" scoped>
+.no-instance {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	gap: var(--gap-md);
+
+	p,
+	h3 {
+		margin: 0;
+	}
+
+	.icon {
+		svg {
+			width: 10rem;
+			height: 10rem;
+		}
+	}
+}
+
+.fade-enter-active,
+.fade-leave-active {
+	transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+	opacity: 0;
+}
+</style>

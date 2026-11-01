@@ -1,0 +1,94 @@
+// @ts-nocheck
+import { reactive, ref, watch } from 'vue'
+
+export const DEFAULT_FEATURE_FLAGS = {
+	project_background: false,
+	page_path: false,
+	worlds_in_home: true,
+	server_project_qa: false,
+	show_version_environment_column: false,
+	server_ram_as_bytes_always_on: false,
+	always_show_app_controls: false,
+	show_sync_instances_update_modal: false,
+	skip_non_essential_warnings: false,
+	skip_unknown_pack_warning: false,
+	pride_fundraiser: true,
+	i18n_debug: false,
+	show_instance_play_time: true,
+	compact_instance_cards: false,
+	advanced_filters_collapsed: true,
+	always_show_copy_details: false,
+	hide_installed_modpacks: false,
+	friends_active_collapsed: false,
+	friends_online_collapsed: false,
+	friends_offline_collapsed: true,
+	friends_pending_collapsed: true,
+	dismissed_photosensitivity_filter_warning: false,
+	localhost_sign_in: false,
+}
+
+export type FeatureFlag = keyof typeof DEFAULT_FEATURE_FLAGS
+type FeatureFlags = Record<FeatureFlag, boolean>
+
+const syncFeaturesAcrossDevices = ref(false)
+
+// Written by App.vue from the startup settings. Neither of these has a UI
+// toggle in the fork — settings stay on this device, and the upload those
+// toggles would drive is dropped in `helpers/user-preferences.ts` — but the
+// fields are part of the upstream sync contract, so they stay as plain data
+// holders rather than being deleted from the settings table.
+const syncBehaviorAcrossDevices = ref(false)
+const featureFlags = reactive<FeatureFlags>({ ...DEFAULT_FEATURE_FLAGS })
+
+
+function setFeaturesSyncAcrossDevices(enabled: boolean): void {
+	syncFeaturesAcrossDevices.value = enabled
+}
+
+function getFeatureFlag(key: FeatureFlag): boolean {
+	return featureFlags[key] ?? DEFAULT_FEATURE_FLAGS[key]
+}
+
+// Subscription system — mimics Pinia store $subscribe
+type SubCallback = () => void
+const subscribers = new Set<SubCallback>()
+
+function notifySubscribers() {
+	subscribers.forEach(fn => fn())
+}
+
+const appSettings = reactive({
+	syncFeaturesAcrossDevices,
+	syncBehaviorAcrossDevices,
+	toggleSidebar: false,
+	hideNametagSkinsPage: false,
+	showFilesTabInInstances: true,
+	showWorldsTabInInstances: true,
+	showScreenshotsTabInInstances: false,
+	showSkinSelectorInSidebar: true,
+	nativeDecorations: false,
+	devMode: false,
+	featureFlags,
+	setFeaturesSyncAcrossDevices,
+	getFeatureFlag,
+	$subscribe(callback: SubCallback) {
+		subscribers.add(callback)
+		return () => subscribers.delete(callback)
+	},
+})
+
+// Watch any change on appSettings and notify subscribers
+watch(
+	() => ({
+		hideNametagSkinsPage: appSettings.hideNametagSkinsPage,
+		syncBehaviorAcrossDevices: appSettings.syncBehaviorAcrossDevices,
+		toggleSidebar: appSettings.toggleSidebar,
+		devMode: appSettings.devMode,
+	}),
+	() => notifySubscribers(),
+	{ deep: true },
+)
+
+export function useAppSettings() {
+	return appSettings
+}

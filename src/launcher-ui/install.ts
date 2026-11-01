@@ -21,7 +21,7 @@ import FloatingVue from 'floating-vue'
 import type { App } from 'vue'
 import { defineComponent, h, provide, ref, type Ref } from 'vue'
 import { createI18n } from 'vue-i18n'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import {
   AbstractPopupNotificationManager,
@@ -48,6 +48,16 @@ const localeModules = import.meta.glob<{ default: CrowdinMessages }>(
   { eager: true },
 )
 
+/**
+ * 启动器页面自己的文案（id 形如 `app.home.*`）在
+ * `src/launcher-app/locales/` 下。vendor 的 locale 与它合并进同一个 i18n
+ * 实例 —— `useVIntl` 只认 `I18N_INJECTION_KEY`，页面和组件库必须共用一份。
+ */
+const appLocaleModules = import.meta.glob<{ default: CrowdinMessages }>(
+  '../launcher-app/locales/*/index.json',
+  { eager: true },
+)
+
 export const i18n = createI18n({
   legacy: false,
   locale: 'en-US',
@@ -55,7 +65,7 @@ export const i18n = createI18n({
   messageCompiler: createMessageCompiler(),
   missingWarn: false,
   fallbackWarn: false,
-  messages: buildLocaleMessages(localeModules),
+  messages: buildLocaleMessages(localeModules, appLocaleModules),
 })
 
 /**
@@ -161,7 +171,12 @@ export function ensureTagsLoaded(): Promise<void> {
  */
 let installed = false
 
-export function installLauncherUi(app: App): void {
+/**
+ * @param opts.router 启动器页面复刻自带完整路由表（`src/launcher-app/routes.js`）。
+ *   传入时用它替换占位的 catch-all 路由；不传则装一个只渲染空的占位路由
+ *   （仅用于组件库验收页）。
+ */
+export function installLauncherUi(app: App, opts?: { router?: Router }): void {
   // 幂等：启动器小窗可能在热更新后重新挂载，重复 app.use 会重复注册插件
   if (installed) return
   installed = true
@@ -178,11 +193,11 @@ export function installLauncherUi(app: App): void {
   app.use(VueQueryPlugin, { queryClient })
   app.use(i18n)
 
-  const router = createRouter({
+  const stubRouter = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/:pathMatch(.*)*', component: { render: () => null } }],
   })
-  app.use(router)
+  app.use(opts?.router ?? stubRouter)
 
   app.use(FloatingVue, {
     themes: {

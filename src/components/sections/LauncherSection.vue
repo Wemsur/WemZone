@@ -6,10 +6,10 @@ import { useCamera, useCameraFrame } from '@/composables/useCamera'
 import { narrow } from '@/lib/viewport'
 
 /**
- * 真实启动器小窗（Phase 6）。**异步加载**：vendor 组件库约 900KB，
- * 只有相机靠近本区时才需要，不该压首屏。
+ * 真实启动器应用（Phase 6）。**异步加载**：它就是启动器前端的 App.vue
+ * （连同 vendor 组件库约 900KB），只有相机靠近本区时才需要。
  */
-const LauncherWindow = defineAsyncComponent(() => import('./launcher/LauncherWindow.vue'))
+const LauncherWindow = defineAsyncComponent(() => import('./launcher/LauncherApp.vue'))
 
 /**
  * Celestial Launcher 区
@@ -19,8 +19,9 @@ const LauncherWindow = defineAsyncComponent(() => import('./launcher/LauncherWin
  *     下落并左移，后续再替换为分层 + 真实启动器小窗」
  *
  * 进入本区时窗口**从上方下落并左移**到左侧，右侧的标题/介绍/按钮随后浮上来。
- * 窗口本身已经是复刻的启动器（`launcher/LauncherWindow.vue`，Phase 6），
- * 截图只在组件 chunk 还没加载完时充当占位。
+ * 窗口本身是**启动器本人**：`src/launcher-app/App.vue` 原样复制 + Tauri
+ * 数据层换成硬编码样例（见 `launcher/LauncherApp.vue`）。截图只在
+ * 组件 chunk 还没加载完时充当占位。
  *
  * ## 为什么用「时间轴」而不是「相机索引」
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 <template>
 	<div class="min-w-0 text-primary">
 		<span

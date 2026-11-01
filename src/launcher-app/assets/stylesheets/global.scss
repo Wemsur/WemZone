@@ -1,0 +1,525 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import '@modrinth/ui/src/styles/tailwind-utilities.css';
+
+@font-face {
+	font-family: 'bundled-minecraft-font-mrapp';
+	font-style: normal;
+	font-display: swap;
+	font-weight: 400;
+	src: url('https://cdn.modrinth.com/fonts/minecraft/regular.otf') format('opentype');
+}
+
+@font-face {
+	font-family: 'bundled-minecraft-font-mrapp';
+	font-style: italic;
+	font-display: swap;
+	font-weight: 400;
+	src: url('https://cdn.modrinth.com/fonts/minecraft/italic.otf') format('opentype');
+}
+
+@font-face {
+	font-family: 'bundled-minecraft-font-mrapp';
+	font-style: normal;
+	font-display: swap;
+	font-weight: 600;
+	src: url('https://cdn.modrinth.com/fonts/minecraft/bold.otf') format('opentype');
+}
+
+@font-face {
+	font-family: 'bundled-minecraft-font-mrapp';
+	font-style: italic;
+	font-display: swap;
+	font-weight: 600;
+	src: url('https://cdn.modrinth.com/fonts/minecraft/bold-italic.otf') format('opentype');
+}
+
+.font-minecraft {
+	font-family: 'bundled-minecraft-font-mrapp', monospace;
+}
+
+:root {
+	font-family: var(--font-standard, sans-serif), sans-serif;
+	--view-width: calc(100% - 5rem);
+	--expanded-view-width: calc(100% - 13rem);
+	--medal-promotion-bg: #000;
+	--medal-promotion-bg-orange: rgba(208, 246, 255, 0.25);
+	--medal-promotion-text-orange: #42abff;
+	--medal-promotion-bg-gradient: linear-gradient(
+		90deg,
+		rgba(66, 170, 255, 0.15),
+		rgba(0, 0, 0, 0) 100%
+	);
+}
+
+html.light-mode {
+	color-scheme: light;
+}
+
+body {
+	position: fixed;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+.card-divider {
+	background-color: var(--color-button-bg);
+	border: none;
+	color: var(--color-button-bg);
+	height: 1px;
+	margin: var(--gap-sm) 0;
+}
+
+.no-wrap {
+	white-space: nowrap;
+}
+
+.no-select {
+	-webkit-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+
+a {
+	color: inherit;
+	text-decoration: none;
+	-webkit-font-smoothing: antialiased;
+	will-change: filter;
+}
+
+.badge {
+	display: flex;
+	border-radius: var(--radius-md);
+	white-space: nowrap;
+	align-items: center;
+	background-color: var(--color-bg);
+	padding-block: var(--gap-sm);
+	padding-inline: var(--gap-lg);
+	width: min-content;
+
+	svg {
+		width: 1.1rem;
+		height: 1.1rem;
+		margin-right: 0.5rem;
+	}
+
+	&.featured {
+		background-color: var(--color-brand-highlight);
+		color: var(--color-contrast);
+	}
+}
+
+* {
+	scrollbar-width: auto;
+	scrollbar-color: var(--color-scrollbar) var(--color-bg);
+}
+
+/* Chrome, Edge, and Safari */
+*::-webkit-scrollbar {
+	width: 16px;
+	border: 3px solid transparent;
+	opacity: 0.5;
+	transition: opacity 0.2s ease-in-out;
+}
+
+*::-webkit-scrollbar:hover {
+	opacity: 1;
+}
+
+*::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+	background-color: var(--color-scrollbar);
+	border-radius: var(--radius-lg);
+	border: 5px solid transparent;
+	background-clip: content-box;
+}
+
+.highlighted {
+	box-shadow: 0 0 1rem var(--color-brand) !important;
+}
+
+.gecko {
+	background-color: var(--color-raised-bg);
+	box-shadow: none !important;
+}
+
+img {
+	user-select: none;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+}
+
+.card-shadow {
+	box-shadow: var(--shadow-card);
+}
+
+// From the Bootstrap project
+// The MIT License (MIT)
+// Copyright (c) 2011-2023 The Bootstrap Authors
+// https://github.com/twbs/bootstrap/blob/2f617215755b066904248525a8c56ea425dde871/scss/mixins/_visually-hidden.scss#L8
+.visually-hidden {
+	width: 1px !important;
+	height: 1px !important;
+	padding: 0 !important;
+	margin: -1px !important;
+	overflow: hidden !important;
+	clip: rect(0, 0, 0, 0) !important;
+	white-space: nowrap !important;
+	border: 0 !important;
+
+	&:not(caption) {
+		position: absolute !important;
+	}
+}
+
+@import '@modrinth/assets/omorphia.scss';
+
+input {
+	border-radius: var(--size-rounded-sm);
+	box-sizing: border-box;
+	border: 2px solid transparent;
+	// safari iOS rounds inputs by default
+	// set the appearance to none to prevent this
+	appearance: none !important;
+}
+
+pre {
+	font-weight: var(--font-weight-regular);
+}
+
+input,
+textarea {
+	background: var(--color-button-bg);
+	color: var(--color-text);
+	padding: 0.5rem 1rem;
+	font-weight: var(--font-weight-medium);
+	border: none;
+	outline: 2px solid transparent;
+	box-shadow:
+		var(--shadow-inset-sm),
+		0 0 0 0 transparent;
+	transition: box-shadow 0.1s ease-in-out;
+	min-height: 36px;
+
+	&:focus,
+	&:focus-visible {
+		box-shadow:
+			inset 0 0 0 transparent,
+			0 0 0 0.25rem var(--color-brand-shadow);
+		color: var(--color-button-text-active);
+	}
+
+	&:disabled,
+	&[disabled='true'] {
+		opacity: 0.6;
+		pointer-events: none;
+		cursor: not-allowed;
+	}
+
+	&:focus::placeholder {
+		opacity: 0.8;
+	}
+
+	&::placeholder {
+		color: var(--color-button-text);
+		opacity: 0.6;
+	}
+}
+
+body.custom-bg-active.custom-bgblur .app-grid-layout {
+    background: none !important;
+}
+body.custom-bg-active:not(.custom-bgblur) .app-grid-layout {
+    background: none !important;
+}
+
+/* 1. 父级网格骨架：变成“幽灵外壳” (修复：加上 body.custom-bg-active 限制) */
+body.custom-bg-active .app-grid-layout {
+	z-index: 10;
+	/* 核心修正：让整个网格线和它的空白区域对鼠标完全透明！
+       这样鼠标就能穿透那些所谓的“隐形盖子”，直接点进处于 z-index: 0 的主卡片里！ */
+	pointer-events: none !important;
+}
+
+/* 2. 顶栏与状态栏：重新捕获鼠标 */
+body.custom-bg-active .app-grid-navbar,
+body.custom-bg-active .app-grid-statusbar {
+    background: transparent !important;
+    position: relative;
+    z-index: 10;
+
+    /* 核心修正：虽然父级让出了点击权，但侧栏和顶栏自身的图标、按钮可不能漏过去。
+       必须强行恢复它们自身的鼠标捕获能力，确保 Worlds 切换、拖拽区域、窗口关闭按钮完美可点！ */
+    pointer-events: auto !important;
+}
+
+/* 3. 主内容卡片：维持在底层喷射阴影，且恢复交互 */
+body.custom-bg-active .app-contents {
+    background-color: color-mix(in srgb, var(--surface-1) 48%, transparent);
+    outline: none;
+    z-index: 0;
+    /* 确保它在底层依然能够承接被上层“幽灵外壳”漏下来的点击事件 */
+    pointer-events: auto !important;
+
+    box-shadow:
+        0 0 0 250px color-mix(in srgb, var(--surface-3) 65%, transparent); /* 逆向外围遮罩 */
+}
+
+/* 4. 你的模糊图片逻辑完全保持原样，无需任何改动 */
+body.custom-bg-active.custom-bgblur .custom-user-bg-img {
+	filter: blur(5px) !important;
+	-webkit-filter: blur(5px) !important;
+	transform: scale(1.03) !important;
+	transform-origin: center center !important;
+	backface-visibility: hidden;
+	will-change: filter, transform;
+}
+body.custom-bg-active:not(.custom-bgblur) .custom-user-bg-img {
+	filter: none !important;
+	transform: scale(1) !important;
+}
+.grid.card-shadow.rounded-xl {
+	transition-duration: 0.1s;
+}
+
+/*body.custom-bg-active.custom-bgblur .grid.card-shadow.rounded-xl {
+	background-color: color-mix(in srgb, var(--surface-3) 30%, transparent);
+	backdrop-filter: blur(10px) !important;
+	border: 1px solid color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+	border-top: 1.4px solid color-mix(in srgb, var(--color-text-primary) 10%, transparent);
+	border-left: 1px solid color-mix(in srgb, var(--color-text-primary) 10%, transparent);
+}
+
+body.custom-bg-active:not(.custom-bgblur) .grid.card-shadow.rounded-xl {
+	background-color: color-mix(in srgb, var(--surface-3) 30%, transparent);
+	border: 1px solid color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+	border-top: 1.4px solid color-mix(in srgb, var(--color-text-primary) 10%, transparent);
+	border-left: 1px solid color-mix(in srgb, var(--color-text-primary) 10%, transparent);
+}
+
+body.custom-bg-active.custom-bgblur .button-base.bg-bg-raised {
+	background-color: color-mix(in srgb, var(--surface-3) 30%, transparent);
+	backdrop-filter: blur(10px) !important;
+	border: 1px solid color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+	border-top: 1.4px solid color-mix(in srgb, var(--color-text-primary) 10%, transparent);
+	border-left: 1px solid color-mix(in srgb, var(--color-text-primary) 10%, transparent);
+}
+
+body.custom-bg-active:not(.custom-bgblur) .button-base.bg-bg-raised {
+	background-color: color-mix(in srgb, var(--surface-3) 30%, transparent);
+	border: 1px solid color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+	border-top: 1.4px solid color-mix(in srgb, var(--color-text-primary) 10%, transparent);
+	border-left: 1px solid color-mix(in srgb, var(--color-text-primary) 10%, transparent);
+}
+
+body.custom-bg-active.custom-bgblur .relative.flex.w-fit.overflow-x-auto.rounded-full {
+	background-color: color-mix(in srgb, var(--surface-3) 30%, transparent);
+	backdrop-filter: blur(10px) !important;
+	border: none;
+}
+body.custom-bg-active:not(.custom-bgblur) .relative.flex.w-fit.overflow-x-auto.rounded-full {
+	background-color: color-mix(in srgb, var(--surface-3) 30%, transparent);
+	border-color: color-mix(in srgb, var(--surface-4) 20%, transparent);
+}
+
+body.custom-bg-active .w-full.touch-manipulation.text-primary {
+	background-color: color-mix(in srgb, var(--surface-4) 50%, transparent);
+	border: 1px solid color-mix(in srgb, var(--color-text-primary) 10%, transparent);
+}
+
+body.custom-bg-active .w-full.h-full.border-solid {
+	background-color: color-mix(in srgb, var(--surface-4) 50%, transparent);
+	border: 1px solid color-mix(in srgb, var(--color-text-primary) 5%, transparent);
+}
+
+body.custom-bg-active .sticky.top-0.z-10.flex.h-12 {
+	background-color: color-mix(in srgb, var(--surface-3) 70%, transparent);
+	border: 1px solid color-mix(in srgb, var(--color-text-primary) 5%, transparent);
+}
+
+body.custom-bg-active .bg-surface-2 {
+	background-color: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+
+body.custom-bg-active [class~="bg-surface-1.5"] {
+	background-color: color-mix(in srgb, var(--surface-1-5) 70%, transparent);
+}
+
+body.custom-bg-active.custom-bgblur .sticky.top-0 {
+	background-color: color-mix(in srgb, var(--surface-1) 50%, transparent);
+	backdrop-filter: blur(20px) !important;
+}
+body.custom-bg-active:not(.custom-bgblur) .sticky.top-0 {
+	background-color: color-mix(in srgb, var(--surface-1) 50%, transparent);
+}
+
+.flex.mt-1.mb-3.leading-none.items-center {
+	background: none;
+}
+
+body.custom-bg-active .modal-body.flex.flex-col.bg-bg-raised {
+	opacity: 0.7;
+}
+
+body.custom-bg-active .selected{
+	background-color: color-mix(in srgb, var(--surface-4) 50%, transparent) !important;
+}
+
+body.custom-bg-active.custom-bgblur {
+    [class*="app-sidebar"] {
+        backdrop-filter: blur(3px) !important;
+        -webkit-backdrop-filter: blur(3px) !important;
+		background-color: color-mix(in srgb, var(--surface-4) 14%, transparent) !important;
+    }
+}
+body.custom-bg-active:not(.custom-bgblur) {
+    [class*="app-sidebar"] {
+        backdrop-filter: blur(3px) !important;
+        -webkit-backdrop-filter: blur(3px) !important;
+		background-color: color-mix(in srgb, var(--surface-4) 14%, transparent) !important;
+    }
+}
+
+body.custom-bg-active .relative.flex.min-h-5 {
+	opacity: 0.7;
+}
+.bg-surface-4.border.border-solid.border-surface-5.shadow-2xl {
+	opacity: 0.9;
+}
+
+body.custom-bg-active .card,
+body.custom-bg-active .relative.min-h-0.flex-1.overflow-hidden {
+	opacity: 0.8;
+}
+
+// 右上角通知 样式
+body.custom-bg-active.custom-bgblur .flex.w-full.flex-col.gap-3.overflow-hidden.rounded-2xl.bg-bg-raised.shadow-xl.border-surface-5.border-solid.border {
+	background-color: color-mix(in srgb, var(--surface-1) 40%, transparent);
+	backdrop-filter: blur(20px) !important;
+	border: 1px solid color-mix(in srgb, var(--color-text-primary) 20%, transparent);
+}
+body.custom-bg-active:not(.custom-bgblur) .flex.w-full.flex-col.gap-3.overflow-hidden.rounded-2xl.bg-bg-raised.shadow-xl.border-surface-5.border-solid.border {
+	background-color: color-mix(in srgb, var(--surface-1) 40%, transparent);
+	border: 1px solid color-mix(in srgb, var(--color-text-primary) 20%, transparent);
+}
+
+body.custom-bg-active.custom-bgblur .notification-toast {
+	background-color: color-mix(in srgb, var(--surface-1) 40%, transparent);
+	backdrop-filter: blur(20px) !important;
+	border: 1px solid color-mix(in srgb, var(--color-text-primary) 20%, transparent);
+}
+body.custom-bg-active:not(.custom-bgblur) .notification-toast {
+	background-color: color-mix(in srgb, var(--surface-1) 40%, transparent);
+	border: 1px solid color-mix(in srgb, var(--color-text-primary) 20%, transparent);
+}
+
+!*body.custom-bg-active .v-popper--has-tooltip {
+	opacity: 0.8 !important;
+}*!
+
+.router-link-active.router-link-exact-active.shrink-0.whitespace-nowrap.text-primary {
+	background: none;
+}*/
+
+.bg-surface-1 {
+	background-color: color-mix(in srgb, var(--surface-1) 60%, transparent);
+}
+
+.bg-surface-1\.5 {
+	background-color: color-mix(in srgb, var(--surface-1-5) 70%, transparent);
+}
+
+body.custom-bg-active .bg-surface-2 {
+	background-color: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+
+body.custom-bg-active .bg-bg-raised {
+	background-color: color-mix(in srgb, var(--surface-3) 70%, transparent);
+}
+
+body.custom-bg-active .bg-surface-3 {
+	background-color: color-mix(in srgb, var(--surface-3) 70%, transparent);
+}
+
+body.custom-bg-active .bg-surface-4 {
+	background-color: color-mix(in srgb, var(--surface-4) 70%, transparent);
+}
+
+body.custom-bg-active .bg-surface-5 {
+	background-color: color-mix(in srgb, var(--surface-5) 70%, transparent);
+}
+
+body.custom-bg-active .combobox-options-scrollbar {
+	opacity: 0.6 !important;
+}
+
+body.custom-bg-active .card {
+	background-color: color-mix(in srgb, var(--surface-3) 88%, transparent);
+}
+
+body.custom-bg-active .context-menu {
+	background-color: color-mix(in srgb, var(--color-raised-bg) 88%, transparent);
+}
+
+.light-sense {
+	position: relative;
+}
+
+.light-sense::after {
+	content: "";
+	position: absolute;
+	top: -1px;
+	left: 0;
+	right: 0;
+	height: calc(100% + 2px);
+	border-radius: inherit;
+
+	background:
+					linear-gradient(
+									90deg,
+									transparent 0%,
+									rgba(255, 255, 255, 0.06) 5%,
+									rgba(255, 255, 255, 0.20) 20%,
+									rgba(255, 255, 255, 0.06) 60%,
+									transparent 100%
+					) top / 100% 1px no-repeat,
+
+						/* 下侧光 */
+					linear-gradient(
+									90deg,
+									transparent 0%,
+									rgba(255, 255, 255, 0.06) 40%,
+									rgba(255, 255, 255, 0.20) 80%,
+									rgba(255, 255, 255, 0.06) 95%,
+									transparent 100%
+					) bottom / 100% 1px no-repeat;
+
+	pointer-events: none;
+	z-index: 10;
+}
+
+body.custom-bg-active.custom-bgblur {
+	[class*="app-sidebar"] {
+		backdrop-filter: blur(3px) !important;
+		-webkit-backdrop-filter: blur(3px) !important;
+		background-color: color-mix(in srgb, var(--surface-4) 14%, transparent) !important;
+	}
+}
+body.custom-bg-active:not(.custom-bgblur) {
+	[class*="app-sidebar"] {
+		backdrop-filter: blur(3px) !important;
+		-webkit-backdrop-filter: blur(3px) !important;
+		background-color: color-mix(in srgb, var(--surface-4) 14%, transparent) !important;
+	}
+}

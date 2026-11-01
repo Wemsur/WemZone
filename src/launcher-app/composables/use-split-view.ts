@@ -1,0 +1,465 @@
+// @ts-nocheck
+import { computed, ref, shallowRef } from 'vue'
+import type { LocationQuery, RouteLocationNormalized, RouteLocationNormalizedLoaded } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+
+import { loadSplitViewEnabled, saveSplitViewEnabled } from '@launcher/helpers/split-view-store'
+
+/**
+ * Discover split view: the project detail page rendered as a nested route of
+ * `/browse/:projectType`, so the discover list stays mounted in the left pane
+ * while the detail fills the right pane.
+ */
+export const BROWSE_LIST_ROUTE_NAME = 'Discover content'
+export const SPLIT_PROJECT_ROUTE_NAME = 'DiscoverSplitProject'
+/** A content source's project page, shown in the same split pane. */
+export const SPLIT_SOURCE_PROJECT_ROUTE_NAME = 'DiscoverSplitSourceProject'
+export const PLAIN_PROJECT_ROUTE_NAME = 'Project'
+/** The same source page at full width, outside split view. */
+export const PLAIN_SOURCE_PROJECT_ROUTE_NAME = 'SourceProject'
+
+export const SPLIT_ROUTE_NAME_BY_SUBPAGE = {
+	description: 'DiscoverSplitProjectDescription',
+	versions: 'DiscoverSplitProjectVersions',
+	version: 'DiscoverSplitProjectVersion',
+	gallery: 'DiscoverSplitProjectGallery',
+} as const
+
+export const PLAIN_ROUTE_NAME_BY_SUBPAGE = {
+	description: 'Description',
+	versions: 'Versions',
+	version: 'Version',
+	gallery: 'Gallery',
+} as const
+
+/**
+ * The same tab names for a content source's project. A source page is a
+ * separate route tree from a Modrinth project's, so splitting one and closing it
+ * again has to name the source's own records rather than the Modrinth ones.
+ */
+export const SPLIT_SOURCE_ROUTE_NAME_BY_SUBPAGE = {
+	description: 'DiscoverSplitSourceProjectDescription',
+	versions: 'DiscoverSplitSourceProjectVersions',
+	version: 'DiscoverSplitSourceProjectVersion',
+	gallery: 'DiscoverSplitSourceProjectGallery',
+} as const
+
+export const PLAIN_SOURCE_ROUTE_NAME_BY_SUBPAGE = {
+	description: 'SourceProjectDescription',
+	versions: 'SourceProjectVersions',
+	version: 'SourceProjectVersion',
+	gallery: 'SourceProjectGallery',
+} as const
+
+export type ProjectSubpage = keyof typeof SPLIT_ROUTE_NAME_BY_SUBPAGE
+
+/**
+ * Query params that describe an install context. They are meaningful to both
+ * panes, so they are the only ones carried across a split view toggle.
+ */
+const CONTEXT_QUERY_PARAMS = ['i', 'ai', 'shi', 'sid', 'wid', 'from'] as const
+
+type RouteLike = RouteLocationNormalized | RouteLocationNormalizedLoaded
+
+interface BrowseTarget {
+	projectType: string
+	query: LocationQuery
+}
+
+/** Last visited discover *list* route, used as the left pane when entering split view. */
+const lastBrowseList = shallowRef<BrowseTarget | null>(null)
+/** Fallback project type, published by the project page while it is open. */
+const browseProjectTypeHint = shallowRef<string | null>(null)
+let trackingRoute = false
+
+/**
+ * The persisted switch, as opposed to `splitViewActive`, which only describes
+ * the route that happens to be open. This is what makes a card on the discover
+ * list open beside the list instead of full width, and it is why the setting is
+ * meaningful on the list page, where no detail pane exists yet.
+ */
+const splitViewPreferred = ref(false)
+let preferenceLoad: Promise<void> | null = null
+/** Settled by the first read, or by the first click if that lands earlier. */
+let preferenceKnown = false
+
+/** Read once per session; the file is tiny and never changes behind our back. */
+function ensurePreferenceLoaded(): Promise<void> {
+	preferenceLoad ??= loadSplitViewEnabled().then((enabled) => {
+		// A click made while the read was in flight is the newer of the two.
+		if (preferenceKnown) return
+
+		preferenceKnown = true
+		if (enabled !== null) splitViewPreferred.value = enabled
+	})
+
+	return preferenceLoad
+}
+
+function setPreference(enabled: boolean) {
+	// Before the early return: a click that matches the default still has to
+	// outrank whatever an unfinished read is about to say.
+	preferenceKnown = true
+	if (splitViewPreferred.value === enabled) return
+
+	splitViewPreferred.value = enabled
+	void saveSplitViewEnabled(enabled)
+}
+
+/** True on the discover list itself, with or without a detail pane open. */
+export function isBrowseRoute(route: RouteLike): boolean {
+	return route.path.startsWith('/browse')
+}
+
+/** True only for a Modrinth project opened in the split pane. */
+export function isModrinthSplitProjectRoute(route: RouteLike): boolean {
+	return route.matched.some((record) => record.name === SPLIT_PROJECT_ROUTE_NAME)
+}
+
+/** True only for a content source's project opened in the split pane. */
+export function isSourceSplitProjectRoute(route: RouteLike): boolean {
+	return route.matched.some((record) => record.name === SPLIT_SOURCE_PROJECT_ROUTE_NAME)
+}
+
+/** Either kind of project in the split pane; this is what drives the layout. */
+export function isSplitProjectRoute(route: RouteLike): boolean {
+	return isModrinthSplitProjectRoute(route) || isSourceSplitProjectRoute(route)
+}
+
+export function isPlainProjectRoute(route: RouteLike): boolean {
+	return route.matched.some(
+		(record) =>
+			record.name === PLAIN_PROJECT_ROUTE_NAME ||
+			record.name === PLAIN_SOURCE_PROJECT_ROUTE_NAME,
+	)
+}
+
+/** True only for a content source's project opened at full width. */
+export function isPlainSourceProjectRoute(route: RouteLike): boolean {
+	return route.matched.some((record) => record.name === PLAIN_SOURCE_PROJECT_ROUTE_NAME)
+}
+
+/** True for both `/project/:id` and the split view's `/browse/:projectType/p/:id`. */
+export function isProjectDetailRoute(route: RouteLike): boolean {
+	return isPlainProjectRoute(route) || isSplitProjectRoute(route)
+}
+
+export function projectSubpageOf(route: RouteLike): ProjectSubpage {
+	const name = typeof route.name === 'string' ? route.name : ''
+	// A source project's tabs are named in their own records, so all four maps
+	// have to be consulted — matching only the Modrinth ones would drop a source
+	// project's versions or gallery tab back to its description on a toggle.
+	const namesBySubpage = [
+		SPLIT_ROUTE_NAME_BY_SUBPAGE,
+		PLAIN_ROUTE_NAME_BY_SUBPAGE,
+		SPLIT_SOURCE_ROUTE_NAME_BY_SUBPAGE,
+		PLAIN_SOURCE_ROUTE_NAME_BY_SUBPAGE,
+	]
+	for (const subpage of Object.keys(SPLIT_ROUTE_NAME_BY_SUBPAGE) as ProjectSubpage[]) {
+		if (namesBySubpage.some((names) => name === names[subpage])) return subpage
+	}
+	return 'description'
+}
+
+/** Path prefix every project detail link has to be built from. */
+export function projectBasePathOf(route: RouteLike): string {
+	const id = String(route.params.id ?? '')
+	if (isModrinthSplitProjectRoute(route)) {
+		return `/browse/${String(route.params.projectType ?? '')}/p/${id}`
+	}
+	return `/project/${id}`
+}
+
+/** `/source/<source>/<project>` or, in split view, `/browse/<type>/s/<source>/<project>`. */
+export function sourceProjectBasePathOf(route: RouteLike): string {
+	// Re-encoded, not spliced in raw: the params arrive decoded, so a project id
+	// like GitHub's `owner/repo` would otherwise land in the URL as two path
+	// segments — which matches no route, and is what made the tabs go nowhere.
+	const source = encodeURIComponent(String(route.params.sourceId ?? ''))
+	const project = encodeURIComponent(String(route.params.projectId ?? ''))
+	if (isSourceSplitProjectRoute(route)) {
+		return `/browse/${String(route.params.projectType ?? '')}/s/${source}/${project}`
+	}
+	return `/source/${source}/${project}`
+}
+
+/**
+ * A source project's page at `suffix`, keeping the query that describes the
+ * browse context.
+ *
+ * The instance association (`?i=`, plus the server/world context params) lives
+ * in the query, and the discover list reads it from there. A tab link that
+ * dropped it looked like a fresh, unassociated browse session: the list would
+ * lose the instance it was filtering for as soon as the reader opened the
+ * versions tab. Modrinth's own project page carries the query the same way.
+ */
+export function sourceProjectHref(route: RouteLike, suffix = ''): string {
+	const path = `${sourceProjectBasePathOf(route)}${suffix}`
+	const params = new URLSearchParams()
+	for (const [key, value] of Object.entries(route.query)) {
+		for (const entry of Array.isArray(value) ? value : [value]) {
+			if (entry !== null && entry !== undefined && entry !== '') {
+				params.append(key, String(entry))
+			}
+		}
+	}
+	const queryString = params.toString()
+	return queryString ? `${path}?${queryString}` : path
+}
+
+/** `/browse/<type>`, keeping the open detail pane when the split view is active. */
+export function browsePathFor(projectType: string, route: RouteLike): string {
+	const base = `/browse/${projectType}`
+	if (!isSplitProjectRoute(route)) return base
+	const id = String(route.params.id ?? '')
+	return id ? `${base}/p/${id}` : base
+}
+
+function stripQueryParam(query: LocationQuery, key: string): LocationQuery {
+	const rest: LocationQuery = {}
+	for (const [entryKey, value] of Object.entries(query)) {
+		if (entryKey !== key) rest[entryKey] = value
+	}
+	return rest
+}
+
+function pickContextQuery(query: LocationQuery): LocationQuery {
+	const picked: LocationQuery = {}
+	for (const key of CONTEXT_QUERY_PARAMS) {
+		if (query[key] !== undefined) picked[key] = query[key]
+	}
+	return picked
+}
+
+/** The list-only location of a discover route, ignoring any open detail pane. */
+export function browseListLocation(route: RouteLike): { path: string; query: LocationQuery } {
+	return {
+		path: `/browse/${String(route.params.projectType ?? '')}`,
+		query: stripQueryParam(route.query, 'b'),
+	}
+}
+
+export function browseListFullPath(route: RouteLike): string {
+	const location = browseListLocation(route)
+	const params = new URLSearchParams()
+	for (const [key, value] of Object.entries(location.query)) {
+		if (Array.isArray(value)) {
+			for (const entry of value) {
+				if (entry !== null && entry !== '') params.append(key, String(entry))
+			}
+		} else if (value !== null && value !== undefined && value !== '') {
+			params.append(key, String(value))
+		}
+	}
+	const queryString = params.toString()
+	return queryString ? `${location.path}?${queryString}` : location.path
+}
+
+/** Parses a `?b=/browse/mod?...` back-link into a left pane target. */
+function parseBrowseTarget(raw: string): BrowseTarget | null {
+	if (!raw.startsWith('/browse/')) return null
+
+	const [pathPart, queryPart] = raw.split('?')
+	const projectType = pathPart.split('/').filter(Boolean)[1]
+	if (!projectType) return null
+
+	const query: LocationQuery = {}
+	if (queryPart) {
+		for (const [key, value] of new URLSearchParams(queryPart)) {
+			if (key === 'b') continue
+			const existing = query[key]
+			if (existing === undefined) {
+				query[key] = value
+			} else if (Array.isArray(existing)) {
+				existing.push(value)
+			} else {
+				query[key] = [existing, value]
+			}
+		}
+	}
+
+	return { projectType, query }
+}
+
+function rememberBrowseList(route: RouteLike) {
+	if (route.name !== BROWSE_LIST_ROUTE_NAME) return
+	lastBrowseList.value = {
+		projectType: String(route.params.projectType ?? 'mod'),
+		query: { ...route.query },
+	}
+}
+
+export function setBrowseProjectTypeHint(projectType: string | null | undefined) {
+	if (projectType) browseProjectTypeHint.value = projectType
+}
+
+/** The colour the open detail page wants the split pane washed with. */
+const splitDetailColor = shallowRef<string | null>(null)
+
+/** That colour, as `#rrggbb`, or null when nothing is open. */
+export const splitDetailTintColor = computed(() => splitDetailColor.value)
+
+/**
+ * Publish the colour for the discover split pane to wash itself with.
+ *
+ * The pane belongs to the discover page, but only the page inside it knows the
+ * colour: a content source's theme colour, or a Modrinth project's own. The
+ * detail page therefore hands it over rather than the shell trying to guess it
+ * from the route — which is what left Modrinth projects with no tint at all,
+ * since their routes carry no source id to look one up from.
+ */
+export function setSplitDetailColor(color: string | null | undefined) {
+	splitDetailColor.value = color ?? null
+}
+
+/**
+ * Whether a discover card should open into the right pane. Read at click time by
+ * `Browse.vue`; already-open split routes keep their pane regardless, so the
+ * switch can never strand a detail pane in a layout that no longer exists.
+ */
+export const openProjectsInSplitView = computed(() => splitViewPreferred.value)
+
+export function useSplitView() {
+	const route = useRoute()
+	const router = useRouter()
+
+	if (!trackingRoute) {
+		trackingRoute = true
+		rememberBrowseList(router.currentRoute.value)
+		router.afterEach((to) => rememberBrowseList(to))
+	}
+
+	// Needed before the first card click, which is the only place it is read.
+	void ensurePreferenceLoaded()
+
+	const splitViewActive = computed(() => isSplitProjectRoute(route))
+	/**
+	 * The switch is offered on the discover list too, so it can be armed before
+	 * any project is open — that is the whole point of persisting it.
+	 */
+	const canUseSplitView = computed(
+		() => splitViewActive.value || isPlainProjectRoute(route) || isBrowseRoute(route),
+	)
+	/**
+	 * What the button shows. With a project open the route is the truth; on the
+	 * bare list there is nothing to split yet, so the stored intent stands in.
+	 */
+	const splitViewEnabled = computed(() =>
+		isProjectDetailRoute(route) ? splitViewActive.value : splitViewPreferred.value,
+	)
+
+	function resolveBrowseTarget(current: RouteLike): BrowseTarget {
+		const backLink = current.query.b
+		const fromBackLink = typeof backLink === 'string' ? parseBrowseTarget(backLink) : null
+		if (fromBackLink) return fromBackLink
+		if (lastBrowseList.value) return lastBrowseList.value
+		return { projectType: browseProjectTypeHint.value ?? 'mod', query: {} }
+	}
+
+	function enterSplitView() {
+		const current = router.currentRoute.value
+		if (!isPlainProjectRoute(current)) return
+
+		const target = resolveBrowseTarget(current)
+		const subpage = projectSubpageOf(current)
+
+		// A content source's project is a different route tree, keyed by the
+		// source and its project id rather than Modrinth's single id. Splitting it
+		// names the source's own records so its page — and its own tabs — survive
+		// the move, instead of the switch silently doing nothing.
+		//
+		// The source page carries its content type in `?type=` at full width and
+		// reads it back from the split route's `:projectType`, which the left list
+		// also uses for its tab — so the type is the project's own, and the list
+		// opens on that type's tab. The list's own filters still ride along.
+		const source = String(current.params.sourceId ?? '')
+		const project = String(current.params.projectId ?? '')
+		if (isPlainSourceProjectRoute(current)) {
+			if (!source || !project) return
+			const sourceParams: Record<string, string> = {
+				projectType: String(current.query.type ?? target.projectType),
+				sourceId: source,
+				projectId: project,
+			}
+			if (subpage === 'version') sourceParams.version = String(current.params.version ?? '')
+			void router.push({
+				name: SPLIT_SOURCE_ROUTE_NAME_BY_SUBPAGE[subpage],
+				params: sourceParams,
+				query: { ...target.query, ...pickContextQuery(current.query) },
+			})
+			return
+		}
+
+		const id = String(current.params.id ?? '')
+		if (!id) return
+		const params: Record<string, string> = { projectType: target.projectType, id }
+		if (subpage === 'version') params.version = String(current.params.version ?? '')
+
+		void router.push({
+			name: SPLIT_ROUTE_NAME_BY_SUBPAGE[subpage],
+			params,
+			query: { ...target.query, ...pickContextQuery(current.query) },
+		})
+	}
+
+	function exitSplitView() {
+		const current = router.currentRoute.value
+		if (!isSplitProjectRoute(current)) return
+
+		const subpage = projectSubpageOf(current)
+
+		// The source tree again: its full-width route takes the source and project
+		// id, and its tabs are its own records.
+		const source = String(current.params.sourceId ?? '')
+		const project = String(current.params.projectId ?? '')
+		if (isSourceSplitProjectRoute(current)) {
+			if (!source || !project) return
+			const sourceParams: Record<string, string> = { sourceId: source, projectId: project }
+			if (subpage === 'version') sourceParams.version = String(current.params.version ?? '')
+			// The full-width route has no `:projectType` segment, so the type has
+			// to move back into `?type=` or the page loses which kind of content it
+			// is showing — and with it the install path that depends on the type.
+			const type = String(current.params.projectType ?? '')
+			void router.push({
+				name: PLAIN_SOURCE_ROUTE_NAME_BY_SUBPAGE[subpage],
+				params: sourceParams,
+				query: {
+					...pickContextQuery(current.query),
+					...(type ? { type } : {}),
+					b: browseListFullPath(current),
+				},
+			})
+			return
+		}
+
+		const id = String(current.params.id ?? '')
+		if (!id) return
+		const params: Record<string, string> = { id }
+		if (subpage === 'version') params.version = String(current.params.version ?? '')
+
+		void router.push({
+			name: PLAIN_ROUTE_NAME_BY_SUBPAGE[subpage],
+			params,
+			query: { ...pickContextQuery(current.query), b: browseListFullPath(current) },
+		})
+	}
+
+	function toggleSplitView() {
+		if (splitViewEnabled.value) {
+			setPreference(false)
+			exitSplitView()
+		} else {
+			setPreference(true)
+			enterSplitView()
+		}
+	}
+
+	return {
+		splitViewActive,
+		splitViewEnabled,
+		canUseSplitView,
+		enterSplitView,
+		exitSplitView,
+		toggleSplitView,
+	}
+}

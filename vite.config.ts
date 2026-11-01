@@ -88,6 +88,28 @@ export default defineConfig({
      * 这里统一用正则，避免 `@modrinth/ui/src/x` 被当成 `@modrinth/ui` 的子路径。
      */
     alias: [
+      /**
+       * 启动器前端（`src/launcher-app/`，从 CelestialLauncher/apps/app-frontend
+       * 原样复制）依赖 Tauri 的 IPC。这里把每个 `@tauri-apps/*` 模块换成
+       * `src/launcher-app-mock/` 下的替身：数据来自硬编码样例，
+       * 窗口/文件/对话框之类做空操作。**必须放在最前面**（精确匹配）。
+       */
+      { find: /^@tauri-apps\/api\/core$/, replacement: r('./src/launcher-app-mock/core.ts') },
+      { find: /^@tauri-apps\/api\/event$/, replacement: r('./src/launcher-app-mock/event.ts') },
+      { find: /^@tauri-apps\/api\/app$/, replacement: r('./src/launcher-app-mock/app.ts') },
+      { find: /^@tauri-apps\/api\/window$/, replacement: r('./src/launcher-app-mock/window.ts') },
+      { find: /^@tauri-apps\/api\/webview$/, replacement: r('./src/launcher-app-mock/webview.ts') },
+      { find: /^@tauri-apps\/plugin-dialog$/, replacement: r('./src/launcher-app-mock/dialog.ts') },
+      { find: /^@tauri-apps\/plugin-fs$/, replacement: r('./src/launcher-app-mock/fs.ts') },
+      { find: /^@tauri-apps\/plugin-http$/, replacement: r('./src/launcher-app-mock/http.ts') },
+      { find: /^@tauri-apps\/plugin-opener$/, replacement: r('./src/launcher-app-mock/opener.ts') },
+      { find: /^@tauri-apps\/plugin-os$/, replacement: r('./src/launcher-app-mock/os.ts') },
+      {
+        find: /^@tauri-apps\/plugin-window-state$/,
+        replacement: r('./src/launcher-app-mock/window-state.ts'),
+      },
+      // 复制过来的启动器源码：它内部的 `@/` 已改写成 `@launcher/`
+      { find: '@launcher', replacement: r('./src/launcher-app') },
       // vendor 进来的启动器包
       { find: /^#ui\/(.*)$/, replacement: r('./src/vendor/ui/$1') },
       { find: /^@modrinth\/ui\/src\/(.*)$/, replacement: r('./src/vendor/ui/$1') },

@@ -1,3 +1,4 @@
+// @ts-nocheck
 declare module '*.vue' {
 	import type { defineComponent } from 'vue'
 

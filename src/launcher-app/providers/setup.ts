@@ -1,0 +1,39 @@
+// @ts-nocheck
+import type { AbstractModrinthClient } from '@modrinth/api-client'
+import type { AbstractPopupNotificationManager, AbstractWebNotificationManager } from '@modrinth/ui'
+
+import type { InstanceIconConfig } from '@launcher/helpers/types'
+
+import type { AppEvents } from './app-events'
+import { setupOnboardingChecklistProvider } from './onboarding-checklist'
+import { setupCreationModal } from './setup/creation-modal'
+import { setupFileDropProvider } from './setup/file-drop'
+import { setupFilePickerProvider } from './setup/file-picker'
+import { setupImageViewerEditorProvider } from './setup/image-viewer-editor'
+import { setupInstanceImportProvider } from './setup/instance-import'
+import { setupLibraryManagementProvider } from './setup/library-management'
+import { setupTagsProvider } from './setup/tags'
+import { setupUserCountryProvider } from './setup/user-country'
+
+export function setupProviders(
+	client: AbstractModrinthClient,
+	notificationManager: AbstractWebNotificationManager,
+	_popupNotificationManager: AbstractPopupNotificationManager,
+	appEvents: AppEvents,
+	getGeneratedIconConfig?: (iconPath: string) => InstanceIconConfig | null,
+) {
+	setupUserCountryProvider(client)
+	const tags = setupTagsProvider(notificationManager)
+	setupFileDropProvider()
+	setupFilePickerProvider()
+	setupImageViewerEditorProvider()
+	setupInstanceImportProvider(notificationManager)
+	setupLibraryManagementProvider()
+	const onboardingChecklist = setupOnboardingChecklistProvider(appEvents)
+
+	return {
+		...setupCreationModal(notificationManager, getGeneratedIconConfig, appEvents),
+		onboardingChecklist,
+		tags,
+	}
+}

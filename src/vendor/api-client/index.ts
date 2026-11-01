@@ -1,7 +1,7 @@
 // @ts-nocheck
-// vendor 差异：删除了 `platform/tauri` 的导出（以及该文件本身）。
-// 它只在 Tauri 运行时下有意义，且静态 import 了 `@tauri-apps/plugin-http`，
-// 留着会让 Vite 解析失败。WemZone 只用 GenericModrinthClient。
+// vendor 差异：恢复 `platform/tauri`。启动器页面复刻（src/launcher-app）
+// 用的是 TauriModrinthClient；它动态 import `@tauri-apps/plugin-http`，
+// 该模块在浏览器里由 `src/launcher-app-mock/http.ts` 顶上（走 window.fetch）。
 export { AbstractModrinthClient } from './core/abstract-client'
 export { AbstractFeature, type FeatureConfig } from './core/abstract-feature'
 export {
@@ -38,6 +38,7 @@ export { type VerboseLoggingConfig, VerboseLoggingFeature } from './features/ver
 export type { InferredClientModules } from './modules'
 export * from './modules/types'
 export { GenericModrinthClient } from './platform/generic'
+export { TauriModrinthClient, type TauriClientConfig } from './platform/tauri'
 export type { NuxtClientConfig } from './platform/nuxt'
 export { NuxtCircuitBreakerStorage, NuxtModrinthClient } from './platform/nuxt'
 export { GenericSyncClient } from './platform/sync-generic'

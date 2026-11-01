@@ -1,0 +1,23 @@
+// @ts-nocheck
+export {
+	PLUGIN_SLOTS,
+	loadPlugins,
+	sidebarPages,
+	unloadPlugin,
+	unloadPlugins,
+	type PluginEventBus,
+	type PluginHostApi,
+	type PluginRouteDefinition,
+	type PluginSlotId,
+	type PluginVueRuntime,
+	type SidebarPageEntry,
+	type SlotDefinition,
+} from './loader'
+export {
+	HOST_API_NAMES,
+	PLUGIN_EVENTS,
+	PLUGIN_REGIONS,
+	type PluginEventType,
+	type PluginRegionId,
+} from './host-api'
+export type { PluginManifest, PluginSummary, PluginType } from './types'

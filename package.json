@@ -18,8 +18,10 @@
     "@codemirror/language": "^6.13.1",
     "@codemirror/state": "^6.7.6",
     "@codemirror/view": "^6.43.14",
+    "@dnd-kit/vue": "^0.5.3",
     "@intercom/messenger-js-sdk": "^0.0.14",
     "@paper-design/shaders": "^0.0.80",
+    "@sfirew/minecraft-motd-parser": "^1.1.6",
     "@stripe/stripe-js": "^7.10.0",
     "@tanstack/vue-query": "^5.101.4",
     "@tresjs/cientos": "^4.3.1",
@@ -55,6 +57,7 @@
     "vue-router": "^4.6.4",
     "vue3-ace-editor": "^2.2.4",
     "vue3-apexcharts": "^1.8.0 <1.11.0",
+    "vuedraggable": "^4.1.0",
     "xss": "^1.0.15"
   },
   "devDependencies": {

@@ -1,6 +1,5 @@
 <script lang="ts">
-// @ts-nocheck
-</script>
+// @ts-nocheck</script>
 
 <script setup lang="ts" generic="ItemType extends StackedAdmonitionItem">
 import { ChevronDownIcon, XIcon } from '@modrinth/assets'

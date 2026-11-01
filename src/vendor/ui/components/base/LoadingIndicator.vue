@@ -8,8 +8,7 @@
 </template>
 
 <script setup>
-// @ts-nocheck
-</script>
+// @ts-nocheck</script>
 <style scoped>
 .title {
 	position: absolute;

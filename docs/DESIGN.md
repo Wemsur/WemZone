@@ -498,6 +498,33 @@ CSS 的 `blur()` 是各向同性的，像失焦不像运动。两套方案：
 
 体积：`src/vendor/` 约 12MB（不含 `node_modules`），`ui/` 6MB、`assets/` 5.3MB。
 
+### 11.1.5 页面层：整份 `apps/app-frontend` 复制（Phase 6）
+
+复刻启动器页面时**不手写界面**，而是把启动器前端整份搬进来：
+
+| 上游 | 落点 | 改动 |
+|---|---|---|
+| `apps/app-frontend/src`（518 文件） | `src/launcher-app/` | `@/` → `@launcher/`；`routes.js` 的 `createWebHistory` → `createMemoryHistory`；个别相对路径指向 workspace 的 import 改回 `@modrinth/assets`；第三方代码统一加 `// @ts-nocheck` |
+| `@tauri-apps/*`（11 个模块） | `src/launcher-app-mock/` | `invoke` 命令表 → 硬编码样例数据；窗口/文件/对话框/事件做成空操作 |
+
+Vite alias 把 11 个 `@tauri-apps/*` 精确映射到 mock（`vite.config.ts` 最前面），
+`@launcher` 指向复制过来的源码。于是页面代码**一行界面逻辑都不用改**，
+拿到的就是启动器本人；换掉的只有数据来源。
+
+启动器应用通过 `components/sections/launcher/LauncherApp.vue` 挂载：
+逻辑尺寸固定 **1280×800**（Tauri 默认窗口），再整体 `scale` 到嵌入位置，
+所以任何容器里都保持启动器真实比例。插件（FloatingVue / i18n / vue-query /
+router）由 `installLauncherUi(app, { router })` 装上；`router` 传入启动器
+自己的路由表（memory history），不污染站点 URL。
+
+样例数据在 `src/launcher-app-mock/data.ts`（15 个实例、内容库、设置、标签），
+命令表在 `handlers.ts`。**未实现的命令按名字猜空值返回，绝不抛错** ——
+启动器启动时会打一批与界面无关的命令（广告、更新、遥测），抛错会白屏。
+
+> 注意：`packages/ui` 自 Phase 1.5 之后有漂移（新增 `AddLibraryModal` 等），
+> Phase 6 开始时已重新 vendor 一次。以后再从上游拉组件，同样要整包重搬，
+> 只补单个文件会漏掉 barrel 里的新导出。
+
 ### 11.2 七条接线，缺一条就白屏或没样式
 
 **① `#ui/*` alias（229 个文件）**

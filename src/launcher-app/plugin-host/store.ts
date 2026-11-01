@@ -1,0 +1,133 @@
+// @ts-nocheck
+/**
+ * The plugin store: a `plugins.json` index hosted on GitHub, fetched and
+ * rendered as an install list.
+ *
+ * The index is third-party data (anyone can open a PR to it), so it is treated
+ * as such: fetched read-only, every entry validated, and nothing is executed —
+ * a store entry only points at a download. Installing still goes through the
+ * same manifest validation and permission approval as a hand-placed plugin.
+ */
+
+import { ensureUiPreferencesLoaded, uiPreferences } from '@launcher/composables/use-ui-preferences'
+import { fetchJsonWithMirror, mirroredUrl } from '@launcher/helpers/github-mirror'
+
+const DEFAULT_REGISTRY_URL =
+	'https://raw.githubusercontent.com/Wemsur/Celestial-Plugin-Store/refs/heads/main/plugins.json'
+
+const REGISTRY_URL_KEY = 'celestial-plugin-store-url'
+
+export interface StorePlugin {
+	id: string
+	name: string
+	description?: string
+	author?: string
+	/** `owner/name` of the plugin's GitHub repo; drives update detection. */
+	github?: string
+	/** The plugin's own page/repo, shown as a link. */
+	repo?: string
+	/** Direct download of the packaged plugin (a .zip). */
+	download: string
+	icon?: string
+	tags?: string[]
+	apiVersion?: number
+}
+
+interface RegistryFile {
+	version?: number
+	plugins?: unknown[]
+}
+
+/** Where the store index is fetched from. Overridable so you can point at your
+ *  own fork or a staging index without a rebuild. */
+export function registryUrl(): string {
+	if (typeof localStorage === 'undefined') {
+		return DEFAULT_REGISTRY_URL
+	}
+	return localStorage.getItem(REGISTRY_URL_KEY) || DEFAULT_REGISTRY_URL
+}
+
+export function setRegistryUrl(url: string): void {
+	if (typeof localStorage === 'undefined') return
+	if (url.trim()) {
+		localStorage.setItem(REGISTRY_URL_KEY, url.trim())
+	} else {
+		localStorage.removeItem(REGISTRY_URL_KEY)
+	}
+}
+
+/**
+ * A store entry's download URL, routed through the mirror when the user has it
+ * on. GitHub release downloads are the worst case for a blocked network — a
+ * direct `github.com/.../releases/download/...` was measured at 60s to zero
+ * bytes — so the same switch that speeds up the index has to cover these too.
+ *
+ * Only `github.com` and the asset hosts are rewritten; an entry pointing at
+ * some other host is left exactly as the store wrote it.
+ */
+export function pluginDownloadUrl(entry: StorePlugin): string {
+	if (!uiPreferences.githubMirrorEnabled) return entry.download
+	return mirroredUrl(entry.download, uiPreferences.githubMirrorId)
+}
+
+/**
+ * Fetch and validate the store index.
+ *
+ * Uses the browser `fetch` rather than the plugin network proxy on purpose:
+ * this is the launcher fetching its own configured index, not a plugin reaching
+ * out, so it is not subject to plugin grants. The registry host must be allowed
+ * by the launcher CSP's `connect-src` — which is why the mirror hosts are
+ * listed there too, not just `raw.githubusercontent.com`.
+ *
+ * When the user has turned the GitHub mirror on, the index is fetched through
+ * it first and falls back to a direct request if the mirror fails.
+ */
+export async function fetchStorePlugins(): Promise<StorePlugin[]> {
+	await ensureUiPreferencesLoaded()
+	const data = await fetchJsonWithMirror<RegistryFile>(registryUrl(), {
+		enabled: uiPreferences.githubMirrorEnabled,
+		mirrorId: uiPreferences.githubMirrorId,
+	})
+	if (!data || !Array.isArray(data.plugins)) {
+		throw new Error('插件商店索引格式无效：缺少 plugins 数组')
+	}
+
+	return data.plugins
+		.map(normalizeEntry)
+		.filter((entry): entry is StorePlugin => entry !== null)
+}
+
+/** Coerce and vet one raw registry entry; drops anything unusable. */
+function normalizeEntry(raw: unknown): StorePlugin | null {
+	if (!raw || typeof raw !== 'object') return null
+	const record = raw as Record<string, unknown>
+
+	const id = typeof record.id === 'string' ? record.id : null
+	const name = typeof record.name === 'string' ? record.name : null
+	const download = typeof record.download === 'string' ? record.download : null
+	// An entry with no id, name, or download link cannot be shown or installed.
+	if (!id || !name || !download) return null
+
+	// Only http(s) downloads: the installer will fetch this, and a `file:` or
+	// other scheme in third-party data has no legitimate use here.
+	if (!/^https?:\/\//i.test(download)) return null
+
+	const str = (value: unknown) =>
+		typeof value === 'string' ? value : undefined
+
+	return {
+		id,
+		name,
+		download,
+		description: str(record.description),
+		author: str(record.author),
+		github: str(record.github),
+		repo: str(record.repo),
+		icon: str(record.icon),
+		apiVersion:
+			typeof record.apiVersion === 'number' ? record.apiVersion : undefined,
+		tags: Array.isArray(record.tags)
+			? record.tags.filter((tag): tag is string => typeof tag === 'string')
+			: undefined,
+	}
+}

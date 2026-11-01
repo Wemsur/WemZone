@@ -1,6 +1,5 @@
 <script lang="ts">
-// @ts-nocheck
-</script>
+// @ts-nocheck</script>
 
 <script setup lang="ts">
 import { RightArrowIcon } from '@modrinth/assets'

@@ -280,7 +280,7 @@ import {
 	CheckIcon,
 	CopyIcon,
 	RotateCounterClockwiseIcon,
-} from '../../../assets/generated-icons'
+} from '@modrinth/assets'
 import { useFormatDateTime } from '../../composables'
 import { defineMessages, useVIntl } from '../../composables/i18n'
 import { injectModrinthClient } from '../../providers/api-client'

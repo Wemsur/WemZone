@@ -1,3 +1,4 @@
+// @ts-nocheck
 <template>
 	<div class="double-icon">
 		<slot name="primary" />

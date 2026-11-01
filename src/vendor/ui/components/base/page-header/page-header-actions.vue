@@ -1,3 +1,4 @@
+// @ts-nocheck
 <template>
 	<div class="page-header-actions flex flex-wrap items-center gap-2">
 		<slot />

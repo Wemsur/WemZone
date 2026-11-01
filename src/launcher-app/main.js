@@ -1,0 +1,55 @@
+// @ts-nocheck
+import 'floating-vue/dist/style.css'
+import 'overlayscrollbars/overlayscrollbars.css'
+
+import { VueQueryPlugin } from '@tanstack/vue-query'
+import FloatingVue from 'floating-vue'
+import { createApp } from 'vue'
+
+import App from '@launcher/App.vue'
+import { overlayScrollbarsDirective } from '@launcher/directives/overlayScrollbars'
+import { debugStartup, traceStartupStep } from '@launcher/helpers/startup-debug'
+import i18nPlugin from '@launcher/plugins/i18n'
+import i18nDebugPlugin from '@launcher/plugins/i18n-debug'
+import router from '@launcher/routes'
+
+debugStartup('Frontend entry module evaluated')
+const app = createApp(App)
+
+app.use(VueQueryPlugin)
+app.use(router)
+if (import.meta.env.DEV) {
+	void traceStartupStep('Initial router readiness', () => router.isReady()).catch(() => {})
+}
+app.use(FloatingVue, {
+	themes: {
+		'ribbit-popout': {
+			$extend: 'dropdown',
+			placement: 'bottom-end',
+			instantMove: true,
+			distance: 8,
+		},
+		'dismissable-prompt': {
+			$extend: 'dropdown',
+			placement: 'bottom-start',
+		},
+	},
+})
+app.use(i18nPlugin)
+app.use(i18nDebugPlugin)
+app.directive('overlay-scrollbars', overlayScrollbarsDirective)
+
+async function mount() {
+	if (import.meta.env.DEV && import.meta.env.VITE_VUE_SCAN === 'true') {
+		const { VueScanPlugin } = await traceStartupStep(
+			'Load Vue render tracker',
+			() => import('@taijased/vue-render-tracker'),
+		)
+		app.use(new VueScanPlugin({ enabled: true, showOverlay: true, log: false, playSound: false }))
+	}
+	debugStartup('Vue mount started')
+	app.mount('#app')
+	debugStartup('Vue mount completed')
+}
+
+void mount()
