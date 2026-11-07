@@ -368,7 +368,11 @@ function playText(n: number): string {
   transform: scale(1.045);
 }
 
-/* 底部渐变 + 遮罩：标题区从「无」逐渐出现 */
+/* 底部渐变 + 遮罩：标题区从「无」逐渐出现。
+   **不要在这里写 `backdrop-filter: blur(0px)`**：只要不是 `none`，浏览器就会
+   为这张卡片建立 backdrop root 并做一次后台回读 —— 240 张卡片就是 240 次。
+   视觉上 0px 模糊等于没有，代价却和真模糊同量级。需要 hover 模糊时只在
+   `:hover` 里开启（那时最多一两张卡片同时生效）。 */
 .shade {
   position: absolute;
   inset: 42% 0 0 0;
@@ -378,8 +382,6 @@ function playText(n: number): string {
     rgb(6 6 8 / 0.55) 46%,
     rgb(6 6 8 / 0.9) 100%
   );
-  backdrop-filter: blur(0px);
-  transition: backdrop-filter 240ms ease;
 }
 
 .meta {

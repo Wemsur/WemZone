@@ -104,6 +104,21 @@ a {
   color: inherit;
   text-decoration: none;
   -webkit-font-smoothing: antialiased;
+}
+
+/**
+ * `will-change: filter` **只给启动器窗口内部**。
+ *
+ * 上游 global.scss 给 `a` 加这一条，是为了启动器里链接悬停时的过渡；
+ * 但它是全局元素选择器，而这份样式表在启动器区块第一次挂载后就常驻了 ——
+ * 于是**全站 305 个链接**（240 张视频卡片 + 36 张作品卡片 + 导航）都被
+ * 提升成独立合成层、各留一份 filter 表面。按 DPR 1.5 折算，仅视频卡片
+ * 一项就约占 127MB 显存，是低端设备上最主要的一处浪费。
+ *
+ * 收窄到 `.launcher-stage`（组件里挂启动器应用的那一层）后，启动器内部
+ * 行为完全不变，站外的链接不再被提升。
+ */
+.launcher-stage a {
   will-change: filter;
 }
 
