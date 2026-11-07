@@ -129,10 +129,27 @@ function bgMaskStyle(index: number): Record<string, string> {
           ? stops[index].y - prev.y
           : sectionH
   const { mask, heightPct } = sectionBgMask({ sectionH, bgFactor: BG_FACTOR, spacing })
+
+  /**
+   * 只有相机附近的区块需要遮罩。
+   *
+   * 遮罩会给元素多出一张离屏合成表面，转场时是每帧都要付的代价；而竖直
+   * 渐隐带只在**相邻区块的交界处**有意义 —— 间距 102rem、背景半高约 73rem
+   * 时，第 i±2 个区块的背景边沿已经在第 i 个区块视野之外一屏以上，
+   * 遮掉的是看不见的东西。
+   *
+   * 取 ±2 而不是 ±1：第 i+1 个区块的背景顶边正好落在第 i 个区块视野的
+   * 下边缘上，空闲晃动（±13px）和转场倾角会让它偶尔探进来一点。
+   * 同时把 `target` 算进去 —— 转场途中 `current` 还停在出发的区块。
+   */
+  const lo = Math.min(camera.current.value, camera.target.value)
+  const hi = Math.max(camera.current.value, camera.target.value)
+  const value = index >= lo - 2 && index <= hi + 2 ? mask : 'none'
+
   // 用连字符键：Vue 会对它们走 setProperty，`-webkit-` 前缀才会被原样保留
   return {
-    'mask-image': mask,
-    '-webkit-mask-image': mask,
+    'mask-image': value,
+    '-webkit-mask-image': value,
     height: `${heightPct.toFixed(2)}%`,
   }
 }

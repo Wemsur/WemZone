@@ -37,6 +37,13 @@ import { scrollSensitivity } from '@/lib/preferences'
 export interface CameraApi {
   /** 最近的整数区块号。仅在整数变化时更新。 */
   current: Readonly<Ref<number>>
+  /**
+   * 目标井（整数）。同样只在变化时更新。
+   *
+   * 给「需要提前准备内容」的组件用：`current` 在落位后才变，而转场途中
+   * 相机已经朝 `target` 走了，只看 `current` 会漏掉前方那一段。
+   */
+  target: Readonly<Ref<number>>
   /** 当前状态名。低频。 */
   state: Readonly<Ref<string>>
   goTo(index: number, opts?: { immediate?: boolean }): void
@@ -67,6 +74,7 @@ export function provideCamera(): CameraApi {
   })
 
   const current = ref(0)
+  const target = ref(0)
   const state = ref<string>('IDLE')
   /** 几何重建计数器：模板依赖它来重算各区块的静态 transform。 */
   const geometryVersion = ref(0)
@@ -78,6 +86,7 @@ export function provideCamera(): CameraApi {
     if (worldEl) renderPose(worldEl, frame.pose, CAMERA.PERSPECTIVE, !overviewOn.value)
     // 只在状态名变化时碰响应式
     if (state.value !== frame.state) state.value = frame.state
+    if (target.value !== engine.target) target.value = engine.target
   })
 
   engine.onSettle((index) => {
@@ -90,6 +99,7 @@ export function provideCamera(): CameraApi {
 
   const api: CameraApi = {
     current: readonly(current),
+    target: readonly(target),
     state: readonly(state),
     goTo: (index, opts) => engine.goTo(index, opts),
     step: (dir) => engine.step(dir),
