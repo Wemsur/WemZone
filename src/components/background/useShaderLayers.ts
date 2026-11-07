@@ -24,38 +24,46 @@ export interface ShaderLayer {
   uniforms: ShaderMountUniforms
   /** 正常播放时的时间流速 */
   speed: number
+  /**
+   * 相机运动时的处理方式。两者都不改变静止时的画面。
+   *
+   * - `'pause'`（默认）：停帧。适合**高频图案**——抖动点阵的格子大小是按
+   *   输出像素算的（`u_pxSize`），降分辨率会把点阵放大成肉眼可见的方块；
+   *   而这些层的流速都很慢（0.07–0.09），整个画面在平移时停一秒多看不出来。
+   * - `'lowres'`：降到 1/4 像素继续跑。适合**平滑的流体**——它没有高频细节，
+   *   降分辨率看不出来，因此仍保持「一直在流动」的观感。
+   *
+   * 实测转场时把 3 个着色器画布全部藏掉，帧间隔从 p50 8.3ms / p90 12.4ms
+   * 回到 4.2 / 4.3 —— 着色器填充是转场里最大的一笔渲染开销。
+   */
+  motion?: 'pause' | 'lowres'
 }
 
 /** 视口外多少像素内仍算「可见」——留一点余量，进场时已经在动 */
 const MARGIN = 160
 
+/**
+ * 判定「相机在运动」的速度阈值（索引/秒）。
+ *
+ * 进出用两个不同的值：果冻回弹会让速度在阈值附近来回穿几次，
+ * 单阈值会让每一层反复重建帧缓冲。滞环把它压到每次手势最多两次状态切换。
+ */
+const MOTION_ENTER = 0.09
+const MOTION_EXIT = 0.02
+
+/** `lowres` 层运动期间的像素倍率（0.25 = 线性分辨率减半） */
+const LOW_RES_RATIO = 0.25
+
 export function useShaderLayers(layers: ShaderLayer[]): void {
   const profile = getPerfProfile()
-  const mounts: { mount: ShaderMount; baseSpeed: number }[] = []
+  const mounts: { mount: ShaderMount; baseSpeed: number; policy: 'pause' | 'lowres' }[] = []
   let timer = 0
-
-  /**
-   * 相机运动期间的降分辨率倍率。
-   *
-   * 实测：转场时把 3 个着色器画布藏掉，帧间隔从 p50 8.3ms / p90 12.4ms
-   * 回到 4.2 / 4.3 —— 着色器的填充是转场里最大的一笔渲染开销。
-   * 但背景要求「静止也持续流动」，不能真的停。
-   *
-   * 折中：**只在相机运动时把像素上限降到 1/4**（线性分辨率减半）。
-   * 背景本来是柔和流动的渐变，转场时整屏都在滑，看不出清晰度变化；
-   * 落位瞬间恢复原分辨率。相比「冻住」不会有任何跳变。
-   */
-  const LOW_RES_PIXELS = Math.max(1, Math.round(profile.maxPixels * 0.25))
-
-  /** 当前是否处于降分辨率状态（避免每个过渡帧都重建帧缓冲） */
+  /** 相机是否在运动 */
+  let moving = false
+  /** lowres 层当前是否处于降分辨率状态（避免反复重建帧缓冲） */
   let lowRes = false
 
-  function applyResolution(low: boolean): void {
-    if (low === lowRes || mounts.length === 0) return
-    lowRes = low
-    const cap = low ? LOW_RES_PIXELS : profile.maxPixels
-    for (const { mount } of mounts) mount.setMaxPixelCount(cap)
-  }
+  const lowResPixels = Math.max(1, Math.round(profile.maxPixels * LOW_RES_RATIO))
 
   function inViewport(el: HTMLElement | null): boolean {
     if (!el) return false
@@ -65,12 +73,26 @@ export function useShaderLayers(layers: ShaderLayer[]): void {
     return r.bottom > -MARGIN && r.top < vh + MARGIN && r.right > -MARGIN && r.left < vw + MARGIN
   }
 
-  function syncVisibility(): void {
-    // 总览时所有区块同时可见 —— 让五个 WebGL 背景一起跑没有意义，
-    // 而且在远处它们只是几团色块。停掉，总览本身要的是几何关系。
+  /**
+   * 决定每一层的播放速度：离屏 → 0；相机运动中且策略是 `pause` → 0；
+   * 其余按正常流速。
+   *
+   * 总览时所有区块同时可见 —— 让五个 WebGL 背景一起跑没有意义，
+   * 而且在远处它们只是几团色块。停掉，总览本身要的是几何关系。
+   */
+  function applySpeeds(): void {
     const visible = !overviewOn.value && inViewport(layers[0]?.host.value ?? null)
-    for (const { mount, baseSpeed } of mounts) {
-      mount.setSpeed(visible ? baseSpeed : 0)
+    for (const { mount, baseSpeed, policy } of mounts) {
+      mount.setSpeed(visible && !(moving && policy === 'pause') ? baseSpeed : 0)
+    }
+  }
+
+  function applyResolution(): void {
+    if (lowRes === moving) return
+    lowRes = moving
+    const cap = lowRes ? lowResPixels : profile.maxPixels
+    for (const { mount, policy } of mounts) {
+      if (policy === 'lowres') mount.setMaxPixelCount(cap)
     }
   }
 
@@ -90,11 +112,15 @@ export function useShaderLayers(layers: ShaderLayer[]): void {
         1,
         profile.maxPixels,
       )
-      mounts.push({ mount, baseSpeed: layer.speed * profile.speed })
+      mounts.push({
+        mount,
+        baseSpeed: layer.speed * profile.speed,
+        policy: layer.motion ?? 'pause',
+      })
     }
 
-    syncVisibility()
-    timer = window.setInterval(syncVisibility, 250)
+    applySpeeds()
+    timer = window.setInterval(applySpeeds, 250)
   })
 
   onBeforeUnmount(() => {
@@ -104,9 +130,13 @@ export function useShaderLayers(layers: ShaderLayer[]): void {
     mounts.length = 0
   })
 
-  // 相机速度只在「起步 / 落位」两次跨过阈值时改变分辨率状态，
-  // 所以这里每个过渡帧只做一次数值比较，不会反复重建帧缓冲。
+  // 只在速度跨过阈值的那一帧改变状态，过渡途中只做一次数值比较。
   useCameraFrame((frame) => {
-    applyResolution(Math.abs(frame.velocity) > 0.05)
+    const speed = Math.abs(frame.velocity)
+    const next = moving ? speed > MOTION_EXIT : speed > MOTION_ENTER
+    if (next === moving) return
+    moving = next
+    applySpeeds()
+    applyResolution()
   })
 }

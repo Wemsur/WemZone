@@ -61,6 +61,10 @@ useShaderLayers([
       u_grainOverlay: 0.01,
     },
     speed: 0.16,
+    // 流体没有高频细节：运动时降分辨率继续流动，看不出区别。
+    // 下面的点阵层相反 —— 格子按输出像素算，降分辨率会放大成方块，
+    // 所以它用默认的 'pause'。
+    motion: 'lowres',
   },
   {
     host: ditherHost,
