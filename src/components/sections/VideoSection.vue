@@ -125,7 +125,42 @@ function sync(index: number): void {
   }
 }
 
-useCameraFrame((f) => sync(f.index))
+/**
+ * 封面预热
+ *
+ * 240 张封面是远程图，`loading="lazy"` 让它们直到区块快进视野才开始取。
+ * 实测进入本区的那一帧会出现 **57–140ms 的纯渲染长帧**（long-animation-frame
+ * 里脚本时间 0ms），顿挫可见；把这些 `.cover` 藏掉后长帧消失，确认是封面。
+ *
+ * 所以提前一个区块（index > 1.5，约 1.5–2 秒的提前量）就开始分批 `decode()`，
+ * 把「取图 + 解码」摊到转场过程中，而不是撞在进场那一帧上。
+ * `decoding="async"` 保证解码不占主线程。
+ *
+ * 分批而不是一次 240 张：一次全发会瞬间占满网络与解码线程，低端设备反而更卡。
+ */
+let warmed = false
+function warmCovers(): void {
+  if (warmed) return
+  const imgs = Array.from(root.value?.querySelectorAll<HTMLImageElement>('.cover') ?? [])
+  if (imgs.length === 0) return
+  warmed = true
+  void (async () => {
+    for (let i = 0; i < imgs.length; i += 12) {
+      await Promise.all(
+        imgs.slice(i, i + 12).map((img) => {
+          img.loading = 'eager'
+          return img.decode().catch(() => undefined)
+        }),
+      )
+    }
+  })()
+}
+
+useCameraFrame((f) => {
+  // 提前一个区开始预热封面（见 warmCovers）
+  if (f.index > 1.5) warmCovers()
+  sync(f.index)
+})
 
 const root = ref<HTMLElement | null>(null)
 /** 窄版没有相机帧，用可见性开关循环，避免离屏还每帧跑 */
@@ -166,6 +201,8 @@ onMounted(() => {
   measure()
   window.addEventListener('resize', measure, { passive: true })
   void loadLive()
+  // 深链接直接落在本区或其后：没有「提前一个区」的机会，立刻开始预热
+  if (camera.engine.displayIndex > 1.5) warmCovers()
   if (narrow.value && typeof IntersectionObserver !== 'undefined' && root.value) {
     io = new IntersectionObserver((entries) => {
       for (const e of entries) {
@@ -236,6 +273,7 @@ function playText(n: number): string {
                 :src="v.cover"
                 :alt="v.title"
                 loading="lazy"
+                decoding="async"
                 referrerpolicy="no-referrer"
                 draggable="false"
               />
