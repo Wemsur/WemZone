@@ -2,6 +2,7 @@ import { onBeforeUnmount, onMounted, type Ref } from 'vue'
 
 import { ShaderMount, type ShaderMountUniforms } from '@paper-design/shaders'
 
+import { useCameraFrame } from '@/composables/useCamera'
 import { getPerfProfile } from '@/lib/perf'
 import { overviewOn } from '@/lib/overview'
 
@@ -32,6 +33,29 @@ export function useShaderLayers(layers: ShaderLayer[]): void {
   const profile = getPerfProfile()
   const mounts: { mount: ShaderMount; baseSpeed: number }[] = []
   let timer = 0
+
+  /**
+   * 相机运动期间的降分辨率倍率。
+   *
+   * 实测：转场时把 3 个着色器画布藏掉，帧间隔从 p50 8.3ms / p90 12.4ms
+   * 回到 4.2 / 4.3 —— 着色器的填充是转场里最大的一笔渲染开销。
+   * 但背景要求「静止也持续流动」，不能真的停。
+   *
+   * 折中：**只在相机运动时把像素上限降到 1/4**（线性分辨率减半）。
+   * 背景本来是柔和流动的渐变，转场时整屏都在滑，看不出清晰度变化；
+   * 落位瞬间恢复原分辨率。相比「冻住」不会有任何跳变。
+   */
+  const LOW_RES_PIXELS = Math.max(1, Math.round(profile.maxPixels * 0.25))
+
+  /** 当前是否处于降分辨率状态（避免每个过渡帧都重建帧缓冲） */
+  let lowRes = false
+
+  function applyResolution(low: boolean): void {
+    if (low === lowRes || mounts.length === 0) return
+    lowRes = low
+    const cap = low ? LOW_RES_PIXELS : profile.maxPixels
+    for (const { mount } of mounts) mount.setMaxPixelCount(cap)
+  }
 
   function inViewport(el: HTMLElement | null): boolean {
     if (!el) return false
@@ -78,5 +102,11 @@ export function useShaderLayers(layers: ShaderLayer[]): void {
     timer = 0
     for (const { mount } of mounts) mount.dispose()
     mounts.length = 0
+  })
+
+  // 相机速度只在「起步 / 落位」两次跨过阈值时改变分辨率状态，
+  // 所以这里每个过渡帧只做一次数值比较，不会反复重建帧缓冲。
+  useCameraFrame((frame) => {
+    applyResolution(Math.abs(frame.velocity) > 0.05)
   })
 }
